@@ -1,23 +1,47 @@
 const express = require("express");
 const cors = require("cors");
+const supabase = require("./config/supabaseClient");
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Test route
 app.get("/", (req, res) => {
-    res.status(200).send("Backend is running");
+    res.send("Backend is running");
 });
 
-// Health check route
 app.get("/api/health", (req, res) => {
-    res.status(200).json({
+    res.json({
         status: "ok",
         message: "Health route working"
     });
+});
+
+app.get("/api/students", async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from("students")
+            .select("*");
+
+        if (error) {
+            return res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            students: data
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
+    }
 });
 
 module.exports = app;
