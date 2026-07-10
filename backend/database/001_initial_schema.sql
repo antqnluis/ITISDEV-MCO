@@ -1,61 +1,129 @@
-create extension if not exists "pgcrypto";
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
-create table if not exists students (
-  id uuid primary key default gen_random_uuid(),
-  student_number text unique,
-  full_name text not null,
-  college text,
-  program text,
-  year_level int,
-  created_at timestamptz default now()
+CREATE TABLE public.students (
+  id uuid NOT NULL,
+  student_number text NOT NULL UNIQUE CHECK (char_length(btrim(student_number)) >= 4 AND char_length(btrim(student_number)) <= 30),
+  consent_given boolean NOT NULL DEFAULT false,
+  consented_at timestamp with time zone,
+  privacy_notice_version text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT students_pkey PRIMARY KEY (id),
+  CONSTRAINT students_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
-
-create table if not exists student_profiles (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references students(id) on delete cascade,
-  role_context text,
-  is_athlete boolean default false,
-  is_org_officer boolean default false,
-  has_ojt boolean default false,
-  has_caregiving_duties boolean default false,
-  commute_hours numeric(4,2),
-  created_at timestamptz default now()
+CREATE TABLE public.student_profiles (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL UNIQUE,
+  college text NOT NULL CHECK (char_length(btrim(college)) > 0),
+  program text NOT NULL CHECK (char_length(btrim(program)) > 0),
+  year_level smallint NOT NULL CHECK (year_level >= 1 AND year_level <= 6),
+  commute_minutes_per_day smallint NOT NULL DEFAULT 0 CHECK (commute_minutes_per_day >= 0 AND commute_minutes_per_day <= 1440),
+  available_study_hours_per_week numeric NOT NULL DEFAULT 0 CHECK (available_study_hours_per_week >= 0::numeric AND available_study_hours_per_week <= 168::numeric),
+  has_caregiving_responsibility boolean NOT NULL DEFAULT false,
+  caregiving_hours_per_week numeric NOT NULL DEFAULT 0 CHECK (caregiving_hours_per_week >= 0::numeric AND caregiving_hours_per_week <= 168::numeric),
+  is_employed boolean NOT NULL DEFAULT false,
+  work_hours_per_week numeric NOT NULL DEFAULT 0 CHECK (work_hours_per_week >= 0::numeric AND work_hours_per_week <= 168::numeric),
+  has_ojt boolean NOT NULL DEFAULT false,
+  ojt_hours_per_week numeric NOT NULL DEFAULT 0 CHECK (ojt_hours_per_week >= 0::numeric AND ojt_hours_per_week <= 168::numeric),
+  is_athlete boolean NOT NULL DEFAULT false,
+  athlete_hours_per_week numeric NOT NULL DEFAULT 0 CHECK (athlete_hours_per_week >= 0::numeric AND athlete_hours_per_week <= 168::numeric),
+  has_organization_responsibility boolean NOT NULL DEFAULT false,
+  organization_role text CHECK (organization_role IS NULL OR char_length(organization_role) <= 200),
+  organization_hours_per_week numeric NOT NULL DEFAULT 0 CHECK (organization_hours_per_week >= 0::numeric AND organization_hours_per_week <= 168::numeric),
+  additional_context text CHECK (additional_context IS NULL OR char_length(additional_context) <= 2000),
+  onboarding_completed_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT student_profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT student_profiles_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
-
-create table if not exists wellness_checkins (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references students(id) on delete cascade,
-
-  stress_level int not null check (stress_level between 1 and 5),
-  sleep_quality int not null check (sleep_quality between 1 and 5),
-  motivation_level int not null check (motivation_level between 1 and 5),
-
-  academic_workload int not null check (academic_workload between 1 and 5),
-  role_load int not null check (role_load between 1 and 5),
-  logistical_load int not null check (logistical_load between 1 and 5),
-  course_environment_load int not null check (course_environment_load between 1 and 5),
-
-  notes text,
-  created_at timestamptz default now()
+CREATE TABLE public.weekly_check_ins (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  week_start date NOT NULL,
+  stress_level smallint NOT NULL CHECK (stress_level >= 1 AND stress_level <= 5),
+  mood_level smallint NOT NULL CHECK (mood_level >= 1 AND mood_level <= 5),
+  sleep_quality smallint NOT NULL CHECK (sleep_quality >= 1 AND sleep_quality <= 5),
+  motivation_level smallint NOT NULL CHECK (motivation_level >= 1 AND motivation_level <= 5),
+  burnout_level smallint NOT NULL CHECK (burnout_level >= 1 AND burnout_level <= 5),
+  energy_level smallint NOT NULL CHECK (energy_level >= 1 AND energy_level <= 5),
+  available_study_hours numeric CHECK (available_study_hours IS NULL OR available_study_hours >= 0::numeric AND available_study_hours <= 168::numeric),
+  reflection text CHECK (reflection IS NULL OR char_length(reflection) <= 4000),
+  submitted_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT weekly_check_ins_pkey PRIMARY KEY (id),
+  CONSTRAINT weekly_check_ins_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
-
-create table if not exists wellness_reports (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references students(id) on delete cascade,
-  checkin_id uuid not null references wellness_checkins(id) on delete cascade,
-
-  student_wellness_index int check (student_wellness_index between 0 and 100),
-  stress_severity_level text check (
-    stress_severity_level in ('Low', 'Moderate', 'High')
-  ),
-  primary_stress_context text,
-  summary text,
-  recommendations text[],
-
-  created_at timestamptz default now()
+CREATE TABLE public.academic_records (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  source text NOT NULL DEFAULT 'mock'::text CHECK (source = ANY (ARRAY['canvas'::text, 'mock'::text, 'manual'::text])),
+  external_record_id text CHECK (external_record_id IS NULL OR char_length(btrim(external_record_id)) > 0),
+  course_code text NOT NULL CHECK (char_length(btrim(course_code)) > 0),
+  course_name text NOT NULL CHECK (char_length(btrim(course_name)) > 0),
+  record_type text NOT NULL CHECK (record_type = ANY (ARRAY['assignment'::text, 'assessment'::text, 'grade_snapshot'::text, 'engagement_snapshot'::text])),
+  title text NOT NULL CHECK (char_length(btrim(title)) > 0),
+  due_at timestamp with time zone,
+  submitted_at timestamp with time zone,
+  submission_status text NOT NULL DEFAULT 'not_applicable'::text CHECK (submission_status = ANY (ARRAY['upcoming'::text, 'on_time'::text, 'late'::text, 'missed'::text, 'not_applicable'::text])),
+  score numeric CHECK (score IS NULL OR score >= 0::numeric),
+  max_score numeric CHECK (max_score IS NULL OR max_score > 0::numeric),
+  grade_percentage numeric DEFAULT 
+CASE
+    WHEN ((score IS NOT NULL) AND (max_score IS NOT NULL) AND (max_score > (0)::numeric)) THEN round(((score / max_score) * (100)::numeric), 2)
+    ELSE NULL::numeric
+END,
+  recorded_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT academic_records_pkey PRIMARY KEY (id),
+  CONSTRAINT academic_records_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
-
-alter table students enable row level security;
-alter table student_profiles enable row level security;
-alter table wellness_checkins enable row level security;
-alter table wellness_reports enable row level security;
+CREATE TABLE public.course_environment_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  check_in_id uuid,
+  course_code text NOT NULL CHECK (char_length(btrim(course_code)) > 0),
+  course_name text NOT NULL CHECK (char_length(btrim(course_name)) > 0),
+  week_start date NOT NULL,
+  workload_difficulty smallint CHECK (workload_difficulty IS NULL OR workload_difficulty >= 1 AND workload_difficulty <= 5),
+  unclear_instruction_level smallint CHECK (unclear_instruction_level IS NULL OR unclear_instruction_level >= 1 AND unclear_instruction_level <= 5),
+  grading_concern_level smallint CHECK (grading_concern_level IS NULL OR grading_concern_level >= 1 AND grading_concern_level <= 5),
+  professor_approachability_concern smallint CHECK (professor_approachability_concern IS NULL OR professor_approachability_concern >= 1 AND professor_approachability_concern <= 5),
+  groupmate_issue_level smallint CHECK (groupmate_issue_level IS NULL OR groupmate_issue_level >= 1 AND groupmate_issue_level <= 5),
+  concern_notes text CHECK (concern_notes IS NULL OR char_length(concern_notes) <= 4000),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT course_environment_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT course_environment_logs_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT course_environment_check_in_student_fk FOREIGN KEY (check_in_id) REFERENCES public.weekly_check_ins(id),
+  CONSTRAINT course_environment_check_in_student_fk FOREIGN KEY (student_id) REFERENCES public.weekly_check_ins(student_id)
+);
+CREATE TABLE public.ai_results (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  check_in_id uuid NOT NULL UNIQUE,
+  swi_score numeric NOT NULL CHECK (swi_score >= 0::numeric AND swi_score <= 100::numeric),
+  risk_category text NOT NULL CHECK (risk_category = ANY (ARRAY['low'::text, 'moderate'::text, 'high'::text])),
+  stress_severity_level text NOT NULL CHECK (stress_severity_level = ANY (ARRAY['low_normal'::text, 'moderate'::text, 'severe'::text, 'critical'::text])),
+  primary_stress_context text NOT NULL CHECK (primary_stress_context = ANY (ARRAY['academic_engagement'::text, 'personal_wellbeing'::text, 'logistical_load'::text, 'role_load'::text, 'course_environment'::text, 'mixed'::text])),
+  academic_engagement_score numeric CHECK (academic_engagement_score IS NULL OR academic_engagement_score >= 0::numeric AND academic_engagement_score <= 100::numeric),
+  personal_wellbeing_score numeric CHECK (personal_wellbeing_score IS NULL OR personal_wellbeing_score >= 0::numeric AND personal_wellbeing_score <= 100::numeric),
+  logistical_load_score numeric CHECK (logistical_load_score IS NULL OR logistical_load_score >= 0::numeric AND logistical_load_score <= 100::numeric),
+  role_load_score numeric CHECK (role_load_score IS NULL OR role_load_score >= 0::numeric AND role_load_score <= 100::numeric),
+  course_environment_score numeric CHECK (course_environment_score IS NULL OR course_environment_score >= 0::numeric AND course_environment_score <= 100::numeric),
+  reflection_keywords ARRAY NOT NULL DEFAULT '{}'::text[],
+  weekly_summary text NOT NULL CHECK (char_length(btrim(weekly_summary)) >= 1 AND char_length(btrim(weekly_summary)) <= 4000),
+  recommendations jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(recommendations) = 'array'::text),
+  analysis_method text NOT NULL DEFAULT 'rule_based'::text CHECK (analysis_method = ANY (ARRAY['rule_based'::text, 'machine_learning'::text, 'llm_assisted'::text, 'hybrid'::text])),
+  analysis_version text NOT NULL DEFAULT '1.0'::text CHECK (char_length(btrim(analysis_version)) > 0),
+  generated_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT ai_results_pkey PRIMARY KEY (id),
+  CONSTRAINT ai_results_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT ai_results_check_in_student_fk FOREIGN KEY (check_in_id) REFERENCES public.weekly_check_ins(id),
+  CONSTRAINT ai_results_check_in_student_fk FOREIGN KEY (student_id) REFERENCES public.weekly_check_ins(student_id)
+);
