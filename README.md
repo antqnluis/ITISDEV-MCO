@@ -140,6 +140,11 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `POST` | `/api/profile` | Create the authenticated student's profile. |
 | `GET` | `/api/profile` | Get the authenticated student's profile. |
 | `PATCH` | `/api/profile` | Update the authenticated student's profile. |
+| `POST` | `/api/check-ins` | Create a weekly check-in. |
+| `GET` | `/api/check-ins` | List the authenticated student's check-ins, newest first. |
+| `GET` | `/api/check-ins/:id` | Get one weekly check-in. |
+| `PATCH` | `/api/check-ins/:id` | Update one weekly check-in. |
+| `DELETE` | `/api/check-ins/:id` | Delete one weekly check-in. |
 
 Example registration body:
 
@@ -158,5 +163,21 @@ For a profile request, the minimum JSON body is:
   "college": "College of Computer Studies",
   "program": "BS Information Technology",
   "year_level": 3
+}
+```
+
+For a weekly check-in, send:
+
+```json
+{
+  "week_start": "2026-07-06",
+  "stress_level": 4,
+  "mood_level": 3,
+  "sleep_quality": 2,
+  "motivation_level": 3,
+  "burnout_level": 4,
+  "energy_level": 2,
+  "available_study_hours": 8,
+  "reflection": "Several deadlines are due this week."
 }
 ```
