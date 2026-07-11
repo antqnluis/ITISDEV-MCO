@@ -3,7 +3,7 @@
 -- Initial Supabase Database Schema
 --
 -- WARNING:
--- This script deletes all existing data from the six listed
+-- This script deletes all existing data from the seven listed
 -- public tables before recreating them.
 --
 -- It does NOT delete auth.users or Supabase system tables.
@@ -19,6 +19,7 @@ begin;
 
 drop table if exists public.ai_results cascade;
 drop table if exists public.course_environment_logs cascade;
+drop table if exists public.calendar_events cascade;
 drop table if exists public.academic_records cascade;
 drop table if exists public.weekly_check_ins cascade;
 drop table if exists public.student_profiles cascade;
@@ -329,6 +330,11 @@ create table public.academic_records (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
 
+    -- Supports composite foreign keys so a linked calendar event
+    -- cannot reference an academic record owned by another student.
+    constraint academic_records_id_student_unique
+        unique (id, student_id),
+
     constraint academic_records_source_valid
         check (
             source in (
@@ -419,7 +425,143 @@ create unique index academic_records_external_record_unique
 
 
 -- ============================================================
--- 7. COURSE ENVIRONMENT LOGS
+-- 7. CALENDAR EVENTS
+--
+-- Stores student-owned academic, personal, logistical,
+-- and role-related commitments.
+--
+-- Calendar events may optionally reference an academic record.
+-- For the MVP, recurring commitments should be stored as one
+-- row per occurrence rather than using recurrence rules.
+-- ============================================================
+
+create table public.calendar_events (
+    id uuid primary key default gen_random_uuid(),
+
+    student_id uuid not null
+        references public.students(id)
+        on delete cascade,
+
+    academic_record_id uuid,
+
+    source text not null default 'manual',
+    external_event_id text,
+
+    event_type text not null,
+
+    title text not null,
+    description text,
+    location text,
+
+    starts_at timestamptz not null,
+    ends_at timestamptz,
+
+    all_day boolean not null default false,
+
+    status text not null default 'scheduled',
+    completed_at timestamptz,
+
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+
+    constraint calendar_events_academic_record_student_fk
+        foreign key (academic_record_id, student_id)
+        references public.academic_records(id, student_id)
+        on delete cascade,
+
+    constraint calendar_events_source_valid
+        check (
+            source in (
+                'manual',
+                'canvas',
+                'system'
+            )
+        ),
+
+    constraint calendar_events_type_valid
+        check (
+            event_type in (
+                'class',
+                'assignment_deadline',
+                'exam',
+                'study_block',
+                'rest_block',
+                'ojt',
+                'organization',
+                'athletics',
+                'caregiving',
+                'work',
+                'personal',
+                'other'
+            )
+        ),
+
+    constraint calendar_events_status_valid
+        check (
+            status in (
+                'scheduled',
+                'completed',
+                'cancelled'
+            )
+        ),
+
+    constraint calendar_events_title_not_blank
+        check (
+            char_length(btrim(title)) between 1 and 300
+        ),
+
+    constraint calendar_events_description_length
+        check (
+            description is null
+            or char_length(description) <= 4000
+        ),
+
+    constraint calendar_events_location_length
+        check (
+            location is null
+            or char_length(location) <= 500
+        ),
+
+    constraint calendar_events_external_id_not_blank
+        check (
+            external_event_id is null
+            or char_length(btrim(external_event_id)) > 0
+        ),
+
+    constraint calendar_events_time_valid
+        check (
+            ends_at is null
+            or ends_at >= starts_at
+        ),
+
+    constraint calendar_events_completion_valid
+        check (
+            (
+                status = 'completed'
+                and completed_at is not null
+            )
+            or
+            (
+                status <> 'completed'
+                and completed_at is null
+            )
+        )
+);
+
+
+-- Prevent duplicate Canvas or system events while still allowing
+-- manually created events without an external ID.
+create unique index calendar_events_external_event_unique
+    on public.calendar_events (
+        student_id,
+        source,
+        external_event_id
+    )
+    where external_event_id is not null;
+
+
+-- ============================================================
+-- 8. COURSE ENVIRONMENT LOGS
 --
 -- Stores student-reported concerns for individual courses.
 --
@@ -525,7 +667,7 @@ create table public.course_environment_logs (
 
 
 -- ============================================================
--- 8. AI RESULTS
+-- 9. AI RESULTS
 --
 -- Stores one generated analysis for each weekly check-in.
 --
@@ -690,7 +832,7 @@ create table public.ai_results (
 
 
 -- ============================================================
--- 9. INDEXES
+-- 10. INDEXES
 --
 -- Improves common dashboard and backend queries.
 -- ============================================================
@@ -724,6 +866,31 @@ create index academic_records_student_status_index
         submission_status
     );
 
+
+create index calendar_events_student_start_index
+    on public.calendar_events (
+        student_id,
+        starts_at
+    );
+
+create index calendar_events_student_type_start_index
+    on public.calendar_events (
+        student_id,
+        event_type,
+        starts_at
+    );
+
+create index calendar_events_student_status_index
+    on public.calendar_events (
+        student_id,
+        status
+    );
+
+create index calendar_events_academic_record_index
+    on public.calendar_events (
+        academic_record_id
+    );
+
 create index course_environment_student_week_index
     on public.course_environment_logs (
         student_id,
@@ -743,7 +910,7 @@ create index ai_results_student_generated_index
 
 
 -- ============================================================
--- 10. AUTOMATIC UPDATED_AT FUNCTION
+-- 11. AUTOMATIC UPDATED_AT FUNCTION
 --
 -- Sets updated_at to the current timestamp whenever a record
 -- is updated.
@@ -762,7 +929,7 @@ $$;
 
 
 -- ============================================================
--- 11. UPDATED_AT TRIGGERS
+-- 12. UPDATED_AT TRIGGERS
 -- ============================================================
 
 create trigger students_set_updated_at
@@ -785,6 +952,12 @@ before update on public.academic_records
 for each row
 execute function public.set_updated_at();
 
+
+create trigger calendar_events_set_updated_at
+before update on public.calendar_events
+for each row
+execute function public.set_updated_at();
+
 create trigger course_environment_logs_set_updated_at
 before update on public.course_environment_logs
 for each row
@@ -797,7 +970,7 @@ execute function public.set_updated_at();
 
 
 -- ============================================================
--- 12. ENABLE ROW-LEVEL SECURITY
+-- 13. ENABLE ROW-LEVEL SECURITY
 -- ============================================================
 
 alter table public.students
@@ -812,6 +985,10 @@ enable row level security;
 alter table public.academic_records
 enable row level security;
 
+
+alter table public.calendar_events
+enable row level security;
+
 alter table public.course_environment_logs
 enable row level security;
 
@@ -820,7 +997,7 @@ enable row level security;
 
 
 -- ============================================================
--- 13. STUDENT RLS POLICIES
+-- 14. STUDENT RLS POLICIES
 --
 -- An authenticated student can create, view, and update their
 -- own public student record.
@@ -858,7 +1035,7 @@ with check (
 
 
 -- ============================================================
--- 14. STUDENT PROFILE RLS POLICIES
+-- 15. STUDENT PROFILE RLS POLICIES
 -- ============================================================
 
 create policy "Students can view their own profile"
@@ -898,7 +1075,7 @@ using (
 
 
 -- ============================================================
--- 15. WEEKLY CHECK-IN RLS POLICIES
+-- 16. WEEKLY CHECK-IN RLS POLICIES
 -- ============================================================
 
 create policy "Students can view their own check-ins"
@@ -938,7 +1115,7 @@ using (
 
 
 -- ============================================================
--- 16. ACADEMIC RECORD RLS POLICY
+-- 17. ACADEMIC RECORD RLS POLICY
 --
 -- Students can read academic records belonging to them.
 -- Insert, update, and delete operations are reserved for the
@@ -955,7 +1132,47 @@ using (
 
 
 -- ============================================================
--- 17. COURSE ENVIRONMENT RLS POLICIES
+-- 18. CALENDAR EVENT RLS POLICIES
+-- ============================================================
+
+create policy "Students can view their own calendar events"
+on public.calendar_events
+for select
+to authenticated
+using (
+    (select auth.uid()) = student_id
+);
+
+create policy "Students can create their own calendar events"
+on public.calendar_events
+for insert
+to authenticated
+with check (
+    (select auth.uid()) = student_id
+);
+
+create policy "Students can update their own calendar events"
+on public.calendar_events
+for update
+to authenticated
+using (
+    (select auth.uid()) = student_id
+)
+with check (
+    (select auth.uid()) = student_id
+);
+
+create policy "Students can delete their own calendar events"
+on public.calendar_events
+for delete
+to authenticated
+using (
+    (select auth.uid()) = student_id
+);
+
+
+-- ============================================================
+-- 19. COURSE ENVIRONMENT RLS POLICIES
 -- ============================================================
 
 create policy "Students can view their own course logs"
@@ -995,7 +1212,7 @@ using (
 
 
 -- ============================================================
--- 18. AI RESULT RLS POLICY
+-- 20. AI RESULT RLS POLICY
 --
 -- Students can read their own AI-generated results.
 -- AI results can only be written by the trusted backend using
@@ -1012,7 +1229,7 @@ using (
 
 
 -- ============================================================
--- 19. DATABASE PERMISSIONS
+-- 21. DATABASE PERMISSIONS
 -- ============================================================
 
 grant usage on schema public
@@ -1034,6 +1251,11 @@ grant select
 on public.academic_records
 to authenticated;
 
+
+grant select, insert, update, delete
+on public.calendar_events
+to authenticated;
+
 grant select, insert, update, delete
 on public.course_environment_logs
 to authenticated;
@@ -1049,6 +1271,7 @@ on public.students,
    public.student_profiles,
    public.weekly_check_ins,
    public.academic_records,
+   public.calendar_events,
    public.course_environment_logs,
    public.ai_results
 to service_role;
