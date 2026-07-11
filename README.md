@@ -52,7 +52,7 @@
    cp .env.example .env
    ```
 
-   Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `backend/.env`. The anon key is used for authentication and all student-scoped requests so Supabase row-level security applies. `SUPABASE_SERVICE_ROLE_KEY` is optional for the current API and must remain server-only.
+   Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `backend/.env`. The anon key is used for authentication and all student-scoped requests so Supabase row-level security applies.
 
    The server uses port `9999` by default. To change it, add `PORT=your_port` to `backend/.env`.
 
@@ -106,10 +106,7 @@ Set the following values in `backend/.env`:
 PORT=9999
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
-
-`SUPABASE_SERVICE_ROLE_KEY` is optional for the current API. Never place it in the frontend or commit `.env` to Git.
 
 Start the development server:
 
