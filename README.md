@@ -18,14 +18,22 @@
 │       └── services/
 ├── docs/
 ├── frontend/
-│   ├── assets/
-│   │   ├── icons/
-│   │   └── images/
-│   ├── css/
-│   │   └── main.css
-│   ├── js/
-│   │   └── utils.js
-│   ├── pages/
+│   ├── public/
+│   ├── src/
+│   │   ├── assets/
+│   │   ├── components/
+│   │   ├── context/
+│   │   ├── hooks/
+│   │   ├── pages/
+│   │   ├── router/
+│   │   ├── services/
+│   │   ├── styles/
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── index.css
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── vite.config.js
 │   └── index.html
 └── README.md
 ```
@@ -76,7 +84,39 @@
 
 ### Frontend
 
-Open `frontend/index.html` directly in a browser, or serve the `frontend` folder with any static file server.
+The frontend will be built using:
+
+- React
+- Vite
+- Tailwind CSS
+- React Router
+
+#### Initial Setup
+
+Open a new terminal:
+
+```sh
+cd frontend
+npm install
+```
+
+This installs all required frontend dependencies.
+
+#### Start the Frontend
+
+```sh
+npm run dev
+```
+
+The development server will start at:
+
+```text
+http://localhost:5173
+```
+
+Open this URL in your browser.
+
+> **Note:** The frontend communicates with the backend through the existing REST API, so make sure the backend server is also running.
 
 ## Windows Setup (PowerShell)
 
@@ -119,6 +159,24 @@ The API will be available at `http://localhost:9999`. To run the automated tests
 ```powershell
 npm test
 ```
+
+### Configure and run the frontend
+
+Open another PowerShell terminal:
+
+```powershell
+cd C:\path\to\ITISDEV-MCO\frontend
+npm install
+npm run dev
+```
+
+Open your browser and visit:
+
+```text
+http://localhost:5173
+```
+
+Make sure the backend server is already running before using the frontend.
 
 ### Test with Thunder Client
 
@@ -179,3 +237,35 @@ For a weekly check-in, send:
   "reflection": "Several deadlines are due this week."
 }
 ```
+
+## Development Workflow
+
+During development, run both the backend and frontend simultaneously.
+
+### Terminal 1 - Backend
+
+```sh
+cd backend
+npm run dev
+```
+
+Backend URL:
+
+```text
+http://localhost:9999
+```
+
+### Terminal 2 - Frontend
+
+```sh
+cd frontend
+npm run dev
+```
+
+Frontend URL:
+
+```text
+http://localhost:5173
+```
+
+The frontend sends HTTP requests to the backend REST API while both development servers are running.
