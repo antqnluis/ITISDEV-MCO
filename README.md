@@ -192,6 +192,7 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `POST` | `/api/auth/login` | Sign in and receive a session access token. |
 | `GET` | `/api/auth/me` | Get the authenticated student. |
 | `POST` | `/api/auth/logout` | End the current session. |
+| `PATCH` | `/api/consent` | Record acceptance of privacy notice version `v1.0`. |
 | `POST` | `/api/profile` | Create the authenticated student's profile. |
 | `GET` | `/api/profile` | Get the authenticated student's profile. |
 | `PATCH` | `/api/profile` | Update the authenticated student's profile. |
@@ -213,6 +214,16 @@ Example registration body:
   "student_number": "20240001"
 }
 ```
+
+To accept the privacy notice, send this authenticated request body to `PATCH /api/consent`:
+
+```json
+{
+  "consent": true
+}
+```
+
+The backend records the acceptance timestamp and privacy notice version `v1.0`.
 
 For a profile request, the minimum JSON body is:
 
