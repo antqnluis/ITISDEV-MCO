@@ -60,7 +60,7 @@
    cp .env.example .env
    ```
 
-   Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `backend/.env`. The anon key is used for authentication and all student-scoped requests so Supabase row-level security applies.
+   Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `backend/.env`. The anon key is used for authentication and all student-scoped requests so Supabase row-level security applies. Set `SUPABASE_SERVICE_ROLE_KEY` only when running a trusted academic-record import; never expose it to clients.
 
    The server uses port `9999` by default. To change it, add `PORT=your_port` to `backend/.env`.
 
@@ -146,6 +146,7 @@ Set the following values in `backend/.env`:
 PORT=9999
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
 Start the development server:
@@ -200,6 +201,8 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `GET` | `/api/check-ins/:id` | Get one weekly check-in. |
 | `PATCH` | `/api/check-ins/:id` | Update one weekly check-in. |
 | `DELETE` | `/api/check-ins/:id` | Delete one weekly check-in. |
+| `GET` | `/api/academic-records` | List the authenticated student's academic records. |
+| `GET` | `/api/academic-records/:id` | Get one authenticated student's academic record. |
 
 Example registration body:
 
@@ -268,3 +271,4 @@ http://localhost:5173
 ```
 
 The frontend sends HTTP requests to the backend REST API while both development servers are running.
+Academic records are read-only for students. `GET /api/academic-records` accepts `limit` (1-100, default 25), `offset` (default 0), and optional `source`, `record_type`, `course_code`, `due_from`, and `due_to` filters. Records are returned by due date, with undated records last. Trusted Canvas, mock, or manual imports must use the backend's internal `importAcademicRecord` service and the service-role key; there is intentionally no public write endpoint.
