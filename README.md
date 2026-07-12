@@ -166,7 +166,6 @@ Open another PowerShell terminal:
 
 ```powershell
 cd C:\path\to\ITISDEV-MCO\frontend
-npm install
 npm run dev
 ```
 
