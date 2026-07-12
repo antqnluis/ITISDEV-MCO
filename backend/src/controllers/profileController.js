@@ -34,8 +34,18 @@ async function update(req, res) {
     }
 }
 
+async function remove(req, res) {
+    try {
+        await profileService.deleteProfile(req.supabase, req.user.id);
+        return res.status(204).send();
+    } catch (error) {
+        return sendError(res, error);
+    }
+}
+
 module.exports = {
     create,
     get,
-    update
+    update,
+    remove
 };

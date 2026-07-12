@@ -137,6 +137,7 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `POST` | `/api/profile` | Create the authenticated student's profile. |
 | `GET` | `/api/profile` | Get the authenticated student's profile. |
 | `PATCH` | `/api/profile` | Update the authenticated student's profile. |
+| `DELETE` | `/api/profile` | Delete the authenticated student's profile. |
 | `POST` | `/api/check-ins` | Create a weekly check-in. |
 | `GET` | `/api/check-ins` | List the authenticated student's check-ins, newest first. |
 | `GET` | `/api/check-ins/:id` | Get one weekly check-in. |

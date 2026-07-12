@@ -258,8 +258,26 @@ async function updateProfile(supabase, studentId, payload) {
     return data;
 }
 
+async function deleteProfile(supabase, studentId) {
+    const { data, error } = await supabase
+        .from("student_profiles")
+        .delete()
+        .eq("student_id", studentId)
+        .select("id")
+        .maybeSingle();
+
+    if (error) {
+        throw createServiceError("Unable to delete the student profile", 500);
+    }
+
+    if (!data) {
+        throw createServiceError("Student profile not found", 404);
+    }
+}
+
 module.exports = {
     createProfile,
     getProfile,
-    updateProfile
+    updateProfile,
+    deleteProfile
 };

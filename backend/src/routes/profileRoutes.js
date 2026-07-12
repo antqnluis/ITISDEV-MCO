@@ -8,5 +8,6 @@ router.use(requireAuth);
 router.post("/", profileController.create);
 router.get("/", profileController.get);
 router.patch("/", profileController.update);
+router.delete("/", profileController.remove);
 
 module.exports = router;

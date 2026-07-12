@@ -6,7 +6,8 @@ const test = require("node:test");
 const {
     createProfile,
     getProfile,
-    updateProfile
+    updateProfile,
+    deleteProfile
 } = require("../src/services/profileService");
 
 const baseProfile = {
@@ -196,5 +197,65 @@ test("updateProfile rejects an organization role when the responsibility is disa
         }),
         (error) => error.statusCode === 400
             && error.message.includes("has_organization_responsibility")
+    );
+});
+
+test("deleteProfile deletes only the authenticated student's profile", async () => {
+    let deletedStudentId;
+    const supabase = {
+        from: (table) => {
+            assert.equal(table, "student_profiles");
+            return {
+                delete: () => ({
+                    eq: (field, value) => {
+                        assert.equal(field, "student_id");
+                        deletedStudentId = value;
+                        return {
+                            select: () => ({
+                                maybeSingle: async () => ({ data: { id: "profile-id" }, error: null })
+                            })
+                        };
+                    }
+                })
+            };
+        }
+    };
+
+    await deleteProfile(supabase, "student-id");
+
+    assert.equal(deletedStudentId, "student-id");
+});
+
+test("deleteProfile reports missing profiles and database failures", async () => {
+    const missingProfileSupabase = {
+        from: () => ({
+            delete: () => ({
+                eq: () => ({
+                    select: () => ({
+                        maybeSingle: async () => ({ data: null, error: null })
+                    })
+                })
+            })
+        })
+    };
+    const failedSupabase = {
+        from: () => ({
+            delete: () => ({
+                eq: () => ({
+                    select: () => ({
+                        maybeSingle: async () => ({ data: null, error: { message: "Database unavailable" } })
+                    })
+                })
+            })
+        })
+    };
+
+    await assert.rejects(
+        deleteProfile(missingProfileSupabase, "student-id"),
+        (error) => error.statusCode === 404 && error.message === "Student profile not found"
+    );
+    await assert.rejects(
+        deleteProfile(failedSupabase, "student-id"),
+        (error) => error.statusCode === 500 && error.message === "Unable to delete the student profile"
     );
 });
