@@ -3,6 +3,7 @@ const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const weeklyCheckInRoutes = require("./routes/weeklyCheckInRoutes");
+const academicRecordRoutes = require("./routes/academicRecordRoutes");
 
 const app = express();
 
@@ -11,6 +12,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/check-ins", weeklyCheckInRoutes);
+app.use("/api/academic-records", academicRecordRoutes);
 
 app.get("/", (req, res) => {
     res.send("Backend is running");
