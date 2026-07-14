@@ -5,7 +5,10 @@ const { requireAuth } = require("../middleware/authMiddleware");
 const router = express.Router();
 
 router.use(requireAuth);
+router.post("/", academicRecordController.create);
 router.get("/", academicRecordController.list);
 router.get("/:id", academicRecordController.get);
+router.patch("/:id", academicRecordController.update);
+router.delete("/:id", academicRecordController.remove);
 
 module.exports = router;

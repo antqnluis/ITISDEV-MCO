@@ -7,6 +7,19 @@ function sendError(res, error) {
     });
 }
 
+async function create(req, res) {
+    try {
+        const academicRecord = await academicRecordService.createAcademicRecord(
+            req.supabase,
+            req.user.id,
+            req.body
+        );
+        return res.status(201).json({ success: true, academicRecord });
+    } catch (error) {
+        return sendError(res, error);
+    }
+}
+
 async function list(req, res) {
     try {
         const result = await academicRecordService.listAcademicRecords(
@@ -33,7 +46,33 @@ async function get(req, res) {
     }
 }
 
+async function update(req, res) {
+    try {
+        const academicRecord = await academicRecordService.updateAcademicRecord(
+            req.supabase,
+            req.user.id,
+            req.params.id,
+            req.body
+        );
+        return res.status(200).json({ success: true, academicRecord });
+    } catch (error) {
+        return sendError(res, error);
+    }
+}
+
+async function remove(req, res) {
+    try {
+        await academicRecordService.deleteAcademicRecord(req.supabase, req.user.id, req.params.id);
+        return res.status(204).send();
+    } catch (error) {
+        return sendError(res, error);
+    }
+}
+
 module.exports = {
+    create,
     list,
-    get
+    get,
+    update,
+    remove
 };

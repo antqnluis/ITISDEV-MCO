@@ -2,7 +2,6 @@ const ACADEMIC_RECORD_SELECT = [
     "id",
     "student_id",
     "source",
-    "external_record_id",
     "course_code",
     "course_name",
     "record_type",
@@ -18,7 +17,7 @@ const ACADEMIC_RECORD_SELECT = [
     "updated_at"
 ].join(", ");
 
-const SOURCES = new Set(["canvas", "mock", "manual"]);
+const SOURCES = new Set(["manual", "mock"]);
 const RECORD_TYPES = new Set([
     "assignment",
     "assessment",
@@ -32,6 +31,17 @@ const SUBMISSION_STATUSES = new Set([
     "missed",
     "not_applicable"
 ]);
+const EDITABLE_FIELDS = new Set([
+    "course_code",
+    "course_name",
+    "record_type",
+    "title",
+    "due_at",
+    "submitted_at",
+    "submission_status",
+    "score",
+    "max_score"
+]);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function createServiceError(message, statusCode = 400) {
@@ -42,6 +52,10 @@ function createServiceError(message, statusCode = 400) {
 
 function isPlainObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasOwn(object, property) {
+    return Object.prototype.hasOwnProperty.call(object, property);
 }
 
 function normalizeUuid(value, fieldName) {
@@ -58,14 +72,6 @@ function normalizeRequiredText(value, fieldName) {
     }
 
     return value.trim();
-}
-
-function normalizeOptionalText(value, fieldName) {
-    if (value === null || value === undefined) {
-        return null;
-    }
-
-    return normalizeRequiredText(value, fieldName);
 }
 
 function normalizeTimestamp(value, fieldName) {
@@ -106,13 +112,13 @@ function normalizeEnum(value, fieldName, allowedValues) {
     return value;
 }
 
-function normalizeNumber(value, fieldName, { minimum = 0, required = false } = {}) {
-    if ((value === undefined || value === null) && !required) {
+function normalizeNumber(value, fieldName, minimum = 0) {
+    if (value === null) {
         return null;
     }
 
     if (typeof value !== "number" || !Number.isFinite(value) || value < minimum) {
-        throw createServiceError(`${fieldName} must be a number greater than or equal to ${minimum}`);
+        throw createServiceError(`${fieldName} must be a number greater than or equal to ${minimum} or null`);
     }
 
     return value;
@@ -135,6 +141,73 @@ function normalizePaginationValue(value, fieldName, defaultValue, minimum, maxim
     return normalized;
 }
 
+function assertScorePair(record) {
+    const hasScore = record.score !== null && record.score !== undefined;
+    const hasMaxScore = record.max_score !== null && record.max_score !== undefined;
+    if (hasScore !== hasMaxScore) {
+        throw createServiceError("score and max_score must either both be supplied or both be null");
+    }
+}
+
+function normalizeRecordInput(payload, { isCreate = false, allowRecordedAt = false } = {}) {
+    if (!isPlainObject(payload)) {
+        throw createServiceError("Request body must be a JSON object");
+    }
+
+    const allowedFields = new Set(EDITABLE_FIELDS);
+    if (allowRecordedAt) {
+        allowedFields.add("recorded_at");
+    }
+
+    const keys = Object.keys(payload);
+    if (!isCreate && keys.length === 0) {
+        throw createServiceError("At least one academic-record field is required");
+    }
+
+    for (const field of keys) {
+        if (!allowedFields.has(field)) {
+            throw createServiceError(`${field} is not an editable academic-record field`);
+        }
+    }
+
+    if (isCreate) {
+        for (const field of ["course_code", "course_name", "record_type", "title"]) {
+            if (!hasOwn(payload, field)) {
+                throw createServiceError(`${field} is required`);
+            }
+        }
+    }
+
+    const record = {};
+    for (const [field, value] of Object.entries(payload)) {
+        if (field === "course_code" || field === "course_name" || field === "title") {
+            record[field] = normalizeRequiredText(value, field);
+            continue;
+        }
+        if (field === "record_type") {
+            record[field] = normalizeEnum(value, field, RECORD_TYPES);
+            continue;
+        }
+        if (field === "due_at" || field === "submitted_at" || field === "recorded_at") {
+            record[field] = normalizeTimestamp(value, field);
+            continue;
+        }
+        if (field === "submission_status") {
+            record[field] = normalizeEnum(value, field, SUBMISSION_STATUSES);
+            continue;
+        }
+        if (field === "score") {
+            record[field] = normalizeNumber(value, field, 0);
+            continue;
+        }
+        if (field === "max_score") {
+            record[field] = normalizeNumber(value, field, Number.EPSILON);
+        }
+    }
+
+    return record;
+}
+
 function normalizeListOptions(query = {}) {
     if (!isPlainObject(query)) {
         throw createServiceError("Query parameters must be an object");
@@ -149,7 +222,6 @@ function normalizeListOptions(query = {}) {
         "due_from",
         "due_to"
     ]);
-
     for (const field of Object.keys(query)) {
         if (!allowedFields.has(field)) {
             throw createServiceError(`${field} is not a supported query parameter`);
@@ -177,96 +249,8 @@ function normalizeListOptions(query = {}) {
     };
 }
 
-function normalizeImportRecord(payload) {
-    if (!isPlainObject(payload)) {
-        throw createServiceError("Academic record must be a JSON object");
-    }
-
-    const allowedFields = new Set([
-        "student_id",
-        "source",
-        "external_record_id",
-        "course_code",
-        "course_name",
-        "record_type",
-        "title",
-        "due_at",
-        "submitted_at",
-        "submission_status",
-        "score",
-        "max_score",
-        "recorded_at"
-    ]);
-
-    for (const field of Object.keys(payload)) {
-        if (!allowedFields.has(field)) {
-            throw createServiceError(`${field} is not an importable academic-record field`);
-        }
-    }
-
-    const score = normalizeNumber(payload.score, "score");
-    const maxScore = normalizeNumber(payload.max_score, "max_score", { minimum: Number.EPSILON });
-    if ((score === null) !== (maxScore === null)) {
-        throw createServiceError("score and max_score must either both be supplied or both be null");
-    }
-
-    return {
-        student_id: normalizeUuid(payload.student_id, "student_id"),
-        source: payload.source === undefined ? "mock" : normalizeEnum(payload.source, "source", SOURCES),
-        external_record_id: normalizeOptionalText(payload.external_record_id, "external_record_id"),
-        course_code: normalizeRequiredText(payload.course_code, "course_code"),
-        course_name: normalizeRequiredText(payload.course_name, "course_name"),
-        record_type: normalizeEnum(payload.record_type, "record_type", RECORD_TYPES),
-        title: normalizeRequiredText(payload.title, "title"),
-        due_at: normalizeTimestamp(payload.due_at, "due_at"),
-        submitted_at: normalizeTimestamp(payload.submitted_at, "submitted_at"),
-        submission_status: payload.submission_status === undefined
-            ? "not_applicable"
-            : normalizeEnum(payload.submission_status, "submission_status", SUBMISSION_STATUSES),
-        score,
-        max_score: maxScore,
-        recorded_at: normalizeTimestamp(payload.recorded_at, "recorded_at")
-    };
-}
-
-function toDatabaseRecord(record) {
-    const { recorded_at: recordedAt, ...databaseRecord } = record;
-    return recordedAt ? { ...databaseRecord, recorded_at: recordedAt } : databaseRecord;
-}
-
-function getServiceSupabase() {
-    return require("../config/supabaseClient").serviceSupabase;
-}
-
-async function findImportedRecord(serviceClient, record) {
-    const { data, error } = await serviceClient
-        .from("academic_records")
-        .select("id")
-        .eq("student_id", record.student_id)
-        .eq("source", record.source)
-        .eq("external_record_id", record.external_record_id)
-        .maybeSingle();
-
-    if (error) {
-        throw createServiceError("Unable to look up the academic record for import", 500);
-    }
-
-    return data;
-}
-
-async function updateImportedRecord(serviceClient, id, databaseRecord) {
-    const { data, error } = await serviceClient
-        .from("academic_records")
-        .update(databaseRecord)
-        .eq("id", id)
-        .select(ACADEMIC_RECORD_SELECT)
-        .single();
-
-    if (error) {
-        throw createServiceError("Unable to update the imported academic record", 500);
-    }
-
-    return data;
+function throwDatabaseError(error, operation) {
+    throw createServiceError(`Unable to ${operation} the academic record`, 500);
 }
 
 async function listAcademicRecords(supabase, studentId, query) {
@@ -301,14 +285,15 @@ async function listAcademicRecords(supabase, studentId, query) {
         throw createServiceError("Unable to retrieve academic records", 500);
     }
 
+    const records = data || [];
     const total = count || 0;
     return {
-        records: data || [],
+        records,
         pagination: {
             limit: options.limit,
             offset: options.offset,
             total,
-            has_more: options.offset + (data || []).length < total
+            has_more: options.offset + records.length < total
         }
     };
 }
@@ -332,44 +317,111 @@ async function getAcademicRecord(supabase, studentId, recordId) {
     return data;
 }
 
-async function importAcademicRecord(payload, serviceClient = getServiceSupabase()) {
-    if (!serviceClient) {
-        throw createServiceError(
-            "SUPABASE_SERVICE_ROLE_KEY is required to import academic records",
-            503
-        );
+async function getEditableManualAcademicRecord(supabase, studentId, recordId) {
+    const record = await getAcademicRecord(supabase, studentId, recordId);
+    if (record.source !== "manual") {
+        throw createServiceError("Mock academic records cannot be modified", 403);
     }
+    return record;
+}
 
-    const record = normalizeImportRecord(payload);
-    const databaseRecord = toDatabaseRecord(record);
-    if (record.external_record_id) {
-        const existing = await findImportedRecord(serviceClient, record);
-        if (existing) {
-            return updateImportedRecord(serviceClient, existing.id, databaseRecord);
-        }
-    }
+async function createAcademicRecord(supabase, studentId, payload) {
+    const record = normalizeRecordInput(payload, { isCreate: true });
+    assertScorePair(record);
 
-    const { data, error } = await serviceClient
+    const { data, error } = await supabase
         .from("academic_records")
-        .insert(databaseRecord)
+        .insert({ ...record, student_id: studentId, source: "manual" })
         .select(ACADEMIC_RECORD_SELECT)
         .single();
 
-    if (error && error.code === "23505" && record.external_record_id) {
-        const existing = await findImportedRecord(serviceClient, record);
-        if (existing) {
-            return updateImportedRecord(serviceClient, existing.id, databaseRecord);
-        }
+    if (error) {
+        throwDatabaseError(error, "create");
     }
 
+    return data;
+}
+
+async function updateAcademicRecord(supabase, studentId, recordId, payload) {
+    const changes = normalizeRecordInput(payload);
+    const currentRecord = await getEditableManualAcademicRecord(supabase, studentId, recordId);
+    assertScorePair({ ...currentRecord, ...changes });
+
+    const { data, error } = await supabase
+        .from("academic_records")
+        .update(changes)
+        .eq("id", currentRecord.id)
+        .eq("student_id", studentId)
+        .eq("source", "manual")
+        .select(ACADEMIC_RECORD_SELECT)
+        .maybeSingle();
+
     if (error) {
-        throw createServiceError("Unable to import the academic record", 500);
+        throwDatabaseError(error, "update");
     }
+    if (!data) {
+        throw createServiceError("Academic record not found", 404);
+    }
+
+    return data;
+}
+
+async function deleteAcademicRecord(supabase, studentId, recordId) {
+    const currentRecord = await getEditableManualAcademicRecord(supabase, studentId, recordId);
+    const { data, error } = await supabase
+        .from("academic_records")
+        .delete()
+        .eq("id", currentRecord.id)
+        .eq("student_id", studentId)
+        .eq("source", "manual")
+        .select("id")
+        .maybeSingle();
+
+    if (error) {
+        throwDatabaseError(error, "delete");
+    }
+    if (!data) {
+        throw createServiceError("Academic record not found", 404);
+    }
+}
+
+function getServiceSupabase() {
+    return require("../config/supabaseClient").serviceSupabase;
+}
+
+async function createMockAcademicRecord(payload, serviceClient = getServiceSupabase()) {
+    if (!serviceClient) {
+        throw createServiceError(
+            "SUPABASE_SERVICE_ROLE_KEY is required to create mock academic records",
+            503
+        );
+    }
+    if (!isPlainObject(payload)) {
+        throw createServiceError("Academic record must be a JSON object");
+    }
+
+    const { student_id: studentId, ...recordPayload } = payload;
+    const record = normalizeRecordInput(recordPayload, { isCreate: true, allowRecordedAt: true });
+    assertScorePair(record);
+
+    const { data, error } = await serviceClient
+        .from("academic_records")
+        .insert({ ...record, student_id: normalizeUuid(studentId, "student_id"), source: "mock" })
+        .select(ACADEMIC_RECORD_SELECT)
+        .single();
+
+    if (error) {
+        throwDatabaseError(error, "create mock");
+    }
+
     return data;
 }
 
 module.exports = {
+    createAcademicRecord,
     listAcademicRecords,
     getAcademicRecord,
-    importAcademicRecord
+    updateAcademicRecord,
+    deleteAcademicRecord,
+    createMockAcademicRecord
 };
