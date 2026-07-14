@@ -204,6 +204,11 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `DELETE` | `/api/check-ins/:id` | Delete one weekly check-in. |
 | `GET` | `/api/academic-records` | List the authenticated student's academic records. |
 | `GET` | `/api/academic-records/:id` | Get one authenticated student's academic record. |
+| `POST` | `/api/course-environment-logs` | Create a course-environment log. |
+| `GET` | `/api/course-environment-logs` | List the authenticated student's course-environment logs. |
+| `GET` | `/api/course-environment-logs/:id` | Get one course-environment log. |
+| `PATCH` | `/api/course-environment-logs/:id` | Update one course-environment log. |
+| `DELETE` | `/api/course-environment-logs/:id` | Delete one course-environment log. |
 
 Example registration body:
 
@@ -251,6 +256,19 @@ For a weekly check-in, send:
 }
 ```
 
+For a course-environment log, send at least one concern rating or note. `check_in_id` is optional and must reference one of the authenticated student's weekly check-ins.
+
+```json
+{
+  "course_code": "ITISDEV",
+  "course_name": "IT Systems Development",
+  "week_start": "2026-07-06",
+  "workload_difficulty": 4,
+  "unclear_instruction_level": 2,
+  "concern_notes": "The implementation workload is high this week."
+}
+```
+
 ## Development Workflow
 
 During development, run both the backend and frontend simultaneously.
@@ -283,3 +301,4 @@ http://localhost:5173
 
 The frontend sends HTTP requests to the backend REST API while both development servers are running.
 Academic records are read-only for students. `GET /api/academic-records` accepts `limit` (1-100, default 25), `offset` (default 0), and optional `source`, `record_type`, `course_code`, `due_from`, and `due_to` filters. Records are returned by due date, with undated records last. Trusted Canvas, mock, or manual imports must use the backend's internal `importAcademicRecord` service and the service-role key; there is intentionally no public write endpoint.
+Course-environment logs accept `limit` (1-100, default 25), `offset` (default 0), and optional `week_start`, `course_code`, and `check_in_id` filters. Results are ordered by newest week, then course code.
