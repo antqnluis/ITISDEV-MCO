@@ -322,3 +322,70 @@ http://localhost:5173
 The frontend sends HTTP requests to the backend REST API while both development servers are running.
 Academic records support student-created manual records and internally seeded mock records. `GET /api/academic-records` accepts `limit` (1-100, default 25), `offset` (default 0), and optional `source` (`manual` or `mock`), `record_type`, `course_code`, `due_from`, and `due_to` filters. Records are returned by due date, with undated records last. Students can create, update, and delete only manual records; mock records are created through the backend's internal `createMockAcademicRecord` service and are read-only to students.
 Course-environment logs accept `limit` (1-100, default 25), `offset` (default 0), and optional `week_start`, `course_code`, and `check_in_id` filters. Results are ordered by newest week, then course code.
+
+## Demo Student Seed
+
+The backend includes a comprehensive demo persona for midterm testing: a working third-year IT student who is also completing OJT, competing as an athlete, serving as an organization vice president, commuting, and providing family care. The seed fills every application table with related profile, wellbeing, academic, course-environment, calendar, and AI-result data.
+
+Add the following server-only values to `backend/.env`:
+
+```env
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+SEED_USER_EMAIL=demo.student@example.com
+SEED_USER_PASSWORD=choose_a_demo_password
+SEED_STUDENT_NUMBER=20260001
+```
+
+Never expose the service-role key to the frontend or commit it to source control. Then run:
+
+```sh
+cd backend
+npm run seed:demo
+```
+
+Dates are anchored to the current Monday in `Asia/Manila`, keeping overdue and upcoming midterm activity current. Rerunning the command updates the Auth credentials, deletes only this demo user's public application records, and recreates a clean dataset without duplicates. The command prints table counts and login identifiers but does not print the password or service-role key.
+
+To run the academic engagement calculator against the records that were actually inserted into Supabase, use:
+
+```sh
+cd backend
+npm run test:academic-seed
+```
+
+This command does not require the backend server. It finds the demo student using `SEED_STUDENT_NUMBER`, uses the highest workload rating from the latest course-log week, and prints the final academic engagement score with its component and requirement-count breakdown.
+
+To calculate the Personal Wellbeing Concern Score from the latest weekly check-in actually stored in Supabase, run:
+
+```sh
+cd backend
+npm run test:wellbeing-seed
+```
+
+This read-only command also works without the backend server. It finds the demo student using `SEED_STUDENT_NUMBER`, selects the latest weekly check-in, and prints its final concern score, raw ratings, and normalized component values.
+
+To calculate the Logistical Load Concern Score from the profile and latest weekly check-in stored in Supabase, run:
+
+```sh
+cd backend
+npm run test:logistical-seed
+```
+
+This read-only command does not require the backend server. It uses the latest weekly study-hour value when available, falls back to the profile value, and prints the final score, calculation inputs, components, and derived values. Internet concern remains unavailable because it is not present in the current schema.
+
+To calculate the Role Load Concern Score from the profile stored in Supabase, run:
+
+```sh
+cd backend
+npm run test:role-seed
+```
+
+This read-only command does not require the backend server. It maps the seeded profile's caregiving, athletics, and organization responsibilities into the calculator and prints the final score, calculation inputs, components, and derived values. Perceived workload and the role-hours ceiling remain unavailable because they are not present in the current schema.
+
+To calculate the Course Environment Concern Score from the latest course-log week stored in Supabase, run:
+
+```sh
+cd backend
+npm run test:course-environment-seed
+```
+
+This read-only command does not require the backend server. It finds the student using `SEED_STUDENT_NUMBER`, calculates each course score from the latest available `week_start`, and prints the weekly score, course breakdown, highest-concern course, and serious-peer-concern indicator.
