@@ -286,9 +286,16 @@ create table public.weekly_check_ins (
 -- ============================================================
 -- 6. ACADEMIC RECORDS
 --
--- Stores Canvas-derived, manually added, or mock academic data.
--- Each row represents an assignment, assessment, grade snapshot,
--- or engagement snapshot.
+-- Stores manually entered or mock academic data.
+--
+-- Manual records are entered by the student through the
+-- application.
+--
+-- Mock records are inserted for testing, demonstrations,
+-- and seeded MVP data.
+--
+-- Each row represents an assignment, assessment, grade
+-- snapshot, or engagement snapshot.
 -- ============================================================
 
 create table public.academic_records (
@@ -298,8 +305,7 @@ create table public.academic_records (
         references public.students(id)
         on delete cascade,
 
-    source text not null default 'mock',
-    external_record_id text,
+    source text not null default 'manual',
 
     course_code text not null,
     course_name text not null,
@@ -338,9 +344,8 @@ create table public.academic_records (
     constraint academic_records_source_valid
         check (
             source in (
-                'canvas',
-                'mock',
-                'manual'
+                'manual',
+                'mock'
             )
         ),
 
@@ -380,12 +385,6 @@ create table public.academic_records (
             char_length(btrim(title)) > 0
         ),
 
-    constraint academic_records_external_id_not_blank
-        check (
-            external_record_id is null
-            or char_length(btrim(external_record_id)) > 0
-        ),
-
     constraint academic_records_score_valid
         check (
             score is null
@@ -413,24 +412,20 @@ create table public.academic_records (
 );
 
 
--- Prevent duplicate Canvas or external records while still
--- allowing records that do not have an external ID.
-create unique index academic_records_external_record_unique
-    on public.academic_records (
-        student_id,
-        source,
-        external_record_id
-    )
-    where external_record_id is not null;
-
-
 -- ============================================================
 -- 7. CALENDAR EVENTS
 --
--- Stores student-owned academic, personal, logistical,
--- and role-related commitments.
+-- Stores manually entered or mock academic, personal,
+-- logistical, and role-related commitments.
+--
+-- Manual events are entered by the student through the
+-- application.
+--
+-- Mock events are inserted for testing, demonstrations,
+-- and seeded MVP data.
 --
 -- Calendar events may optionally reference an academic record.
+--
 -- For the MVP, recurring commitments should be stored as one
 -- row per occurrence rather than using recurrence rules.
 -- ============================================================
@@ -445,7 +440,6 @@ create table public.calendar_events (
     academic_record_id uuid,
 
     source text not null default 'manual',
-    external_event_id text,
 
     event_type text not null,
 
@@ -473,8 +467,7 @@ create table public.calendar_events (
         check (
             source in (
                 'manual',
-                'canvas',
-                'system'
+                'mock'
             )
         ),
 
@@ -522,12 +515,6 @@ create table public.calendar_events (
             or char_length(location) <= 500
         ),
 
-    constraint calendar_events_external_id_not_blank
-        check (
-            external_event_id is null
-            or char_length(btrim(external_event_id)) > 0
-        ),
-
     constraint calendar_events_time_valid
         check (
             ends_at is null
@@ -547,17 +534,6 @@ create table public.calendar_events (
             )
         )
 );
-
-
--- Prevent duplicate Canvas or system events while still allowing
--- manually created events without an external ID.
-create unique index calendar_events_external_event_unique
-    on public.calendar_events (
-        student_id,
-        source,
-        external_event_id
-    )
-    where external_event_id is not null;
 
 
 -- ============================================================
@@ -866,7 +842,6 @@ create index academic_records_student_status_index
         submission_status
     );
 
-
 create index calendar_events_student_start_index
     on public.calendar_events (
         student_id,
@@ -952,7 +927,6 @@ before update on public.academic_records
 for each row
 execute function public.set_updated_at();
 
-
 create trigger calendar_events_set_updated_at
 before update on public.calendar_events
 for each row
@@ -984,7 +958,6 @@ enable row level security;
 
 alter table public.academic_records
 enable row level security;
-
 
 alter table public.calendar_events
 enable row level security;
@@ -1115,11 +1088,10 @@ using (
 
 
 -- ============================================================
--- 17. ACADEMIC RECORD RLS POLICY
+-- 17. ACADEMIC RECORD RLS POLICIES
 --
--- Students can read academic records belonging to them.
--- Insert, update, and delete operations are reserved for the
--- trusted backend using the Supabase service role.
+-- Students can create, view, update, and delete academic
+-- records belonging to their own authenticated account.
 -- ============================================================
 
 create policy "Students can view their own academic records"
@@ -1128,6 +1100,37 @@ for select
 to authenticated
 using (
     (select auth.uid()) = student_id
+);
+
+create policy "Students can create their own academic records"
+on public.academic_records
+for insert
+to authenticated
+with check (
+    (select auth.uid()) = student_id
+    and source = 'manual'
+);
+
+create policy "Students can update their own academic records"
+on public.academic_records
+for update
+to authenticated
+using (
+    (select auth.uid()) = student_id
+    and source = 'manual'
+)
+with check (
+    (select auth.uid()) = student_id
+    and source = 'manual'
+);
+
+create policy "Students can delete their own academic records"
+on public.academic_records
+for delete
+to authenticated
+using (
+    (select auth.uid()) = student_id
+    and source = 'manual'
 );
 
 
@@ -1215,6 +1218,7 @@ using (
 -- 20. AI RESULT RLS POLICY
 --
 -- Students can read their own AI-generated results.
+--
 -- AI results can only be written by the trusted backend using
 -- the Supabase service role.
 -- ============================================================
@@ -1247,10 +1251,9 @@ grant select, insert, update, delete
 on public.weekly_check_ins
 to authenticated;
 
-grant select
+grant select, insert, update, delete
 on public.academic_records
 to authenticated;
-
 
 grant select, insert, update, delete
 on public.calendar_events
@@ -1266,6 +1269,7 @@ to authenticated;
 
 
 -- The backend service role can manage all application records.
+
 grant all
 on public.students,
    public.student_profiles,
