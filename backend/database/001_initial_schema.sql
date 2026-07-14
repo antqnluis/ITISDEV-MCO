@@ -59,8 +59,7 @@ CREATE TABLE public.weekly_check_ins (
 CREATE TABLE public.academic_records (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   student_id uuid NOT NULL,
-  source text NOT NULL DEFAULT 'mock'::text CHECK (source = ANY (ARRAY['canvas'::text, 'mock'::text, 'manual'::text])),
-  external_record_id text CHECK (external_record_id IS NULL OR char_length(btrim(external_record_id)) > 0),
+  source text NOT NULL DEFAULT 'manual'::text CHECK (source = ANY (ARRAY['manual'::text, 'mock'::text])),
   course_code text NOT NULL CHECK (char_length(btrim(course_code)) > 0),
   course_name text NOT NULL CHECK (char_length(btrim(course_name)) > 0),
   record_type text NOT NULL CHECK (record_type = ANY (ARRAY['assignment'::text, 'assessment'::text, 'grade_snapshot'::text, 'engagement_snapshot'::text])),
@@ -68,18 +67,45 @@ CREATE TABLE public.academic_records (
   due_at timestamp with time zone,
   submitted_at timestamp with time zone,
   submission_status text NOT NULL DEFAULT 'not_applicable'::text CHECK (submission_status = ANY (ARRAY['upcoming'::text, 'on_time'::text, 'late'::text, 'missed'::text, 'not_applicable'::text])),
-  score numeric CHECK (score IS NULL OR score >= 0::numeric),
-  max_score numeric CHECK (max_score IS NULL OR max_score > 0::numeric),
-  grade_percentage numeric DEFAULT 
-CASE
-    WHEN ((score IS NOT NULL) AND (max_score IS NOT NULL) AND (max_score > (0)::numeric)) THEN round(((score / max_score) * (100)::numeric), 2)
-    ELSE NULL::numeric
-END,
+  score numeric(8,2) CHECK (score IS NULL OR score >= 0::numeric),
+  max_score numeric(8,2) CHECK (max_score IS NULL OR max_score > 0::numeric),
+  grade_percentage numeric(6,2) GENERATED ALWAYS AS (
+    CASE
+      WHEN score IS NOT NULL AND max_score IS NOT NULL AND max_score > 0 THEN round((score / max_score) * 100, 2)
+      ELSE NULL
+    END
+  ) STORED,
   recorded_at timestamp with time zone NOT NULL DEFAULT now(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT academic_records_pkey PRIMARY KEY (id),
-  CONSTRAINT academic_records_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
+  CONSTRAINT academic_records_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id) ON DELETE CASCADE,
+  CONSTRAINT academic_records_id_student_unique UNIQUE (id, student_id),
+  CONSTRAINT academic_records_score_pair_valid CHECK (
+    (score IS NULL AND max_score IS NULL)
+    OR (score IS NOT NULL AND max_score IS NOT NULL)
+  )
+);
+CREATE TABLE public.calendar_events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  academic_record_id uuid,
+  source text NOT NULL DEFAULT 'manual'::text CHECK (source = ANY (ARRAY['manual'::text, 'mock'::text])),
+  event_type text NOT NULL CHECK (event_type = ANY (ARRAY['class'::text, 'assignment_deadline'::text, 'exam'::text, 'study_block'::text, 'rest_block'::text, 'ojt'::text, 'organization'::text, 'athletics'::text, 'caregiving'::text, 'work'::text, 'personal'::text, 'other'::text])),
+  title text NOT NULL CHECK (char_length(btrim(title)) >= 1 AND char_length(btrim(title)) <= 300),
+  description text CHECK (description IS NULL OR char_length(description) <= 4000),
+  location text CHECK (location IS NULL OR char_length(location) <= 500),
+  starts_at timestamp with time zone NOT NULL,
+  ends_at timestamp with time zone,
+  all_day boolean NOT NULL DEFAULT false,
+  status text NOT NULL DEFAULT 'scheduled'::text CHECK (status = ANY (ARRAY['scheduled'::text, 'completed'::text, 'cancelled'::text])),
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT calendar_events_pkey PRIMARY KEY (id),
+  CONSTRAINT calendar_events_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT calendar_events_academic_record_student_fk FOREIGN KEY (academic_record_id) REFERENCES public.academic_records(id),
+  CONSTRAINT calendar_events_academic_record_student_fk FOREIGN KEY (student_id) REFERENCES public.academic_records(student_id)
 );
 CREATE TABLE public.course_environment_logs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -126,26 +152,4 @@ CREATE TABLE public.ai_results (
   CONSTRAINT ai_results_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
   CONSTRAINT ai_results_check_in_student_fk FOREIGN KEY (check_in_id) REFERENCES public.weekly_check_ins(id),
   CONSTRAINT ai_results_check_in_student_fk FOREIGN KEY (student_id) REFERENCES public.weekly_check_ins(student_id)
-);
-CREATE TABLE public.calendar_events (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  student_id uuid NOT NULL,
-  academic_record_id uuid,
-  source text NOT NULL DEFAULT 'manual'::text CHECK (source = ANY (ARRAY['manual'::text, 'canvas'::text, 'system'::text])),
-  external_event_id text CHECK (external_event_id IS NULL OR char_length(btrim(external_event_id)) > 0),
-  event_type text NOT NULL CHECK (event_type = ANY (ARRAY['class'::text, 'assignment_deadline'::text, 'exam'::text, 'study_block'::text, 'rest_block'::text, 'ojt'::text, 'organization'::text, 'athletics'::text, 'caregiving'::text, 'work'::text, 'personal'::text, 'other'::text])),
-  title text NOT NULL CHECK (char_length(btrim(title)) >= 1 AND char_length(btrim(title)) <= 300),
-  description text CHECK (description IS NULL OR char_length(description) <= 4000),
-  location text CHECK (location IS NULL OR char_length(location) <= 500),
-  starts_at timestamp with time zone NOT NULL,
-  ends_at timestamp with time zone,
-  all_day boolean NOT NULL DEFAULT false,
-  status text NOT NULL DEFAULT 'scheduled'::text CHECK (status = ANY (ARRAY['scheduled'::text, 'completed'::text, 'cancelled'::text])),
-  completed_at timestamp with time zone,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT calendar_events_pkey PRIMARY KEY (id),
-  CONSTRAINT calendar_events_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
-  CONSTRAINT calendar_events_academic_record_student_fk FOREIGN KEY (academic_record_id) REFERENCES public.academic_records(id),
-  CONSTRAINT calendar_events_academic_record_student_fk FOREIGN KEY (student_id) REFERENCES public.academic_records(student_id)
 );

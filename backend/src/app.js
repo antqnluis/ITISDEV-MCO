@@ -5,6 +5,7 @@ const profileRoutes = require("./routes/profileRoutes");
 const consentRoutes = require("./routes/consentRoutes");
 const weeklyCheckInRoutes = require("./routes/weeklyCheckInRoutes");
 const academicRecordRoutes = require("./routes/academicRecordRoutes");
+const courseEnvironmentLogRoutes = require("./routes/courseEnvironmentLogRoutes");
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use("/api/consent", consentRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/check-ins", weeklyCheckInRoutes);
 app.use("/api/academic-records", academicRecordRoutes);
+app.use("/api/course-environment-logs", courseEnvironmentLogRoutes);
 
 app.get("/", (req, res) => {
     res.send("Backend is running");
