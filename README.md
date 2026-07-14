@@ -212,6 +212,11 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `GET` | `/api/course-environment-logs/:id` | Get one course-environment log. |
 | `PATCH` | `/api/course-environment-logs/:id` | Update one course-environment log. |
 | `DELETE` | `/api/course-environment-logs/:id` | Delete one course-environment log. |
+| `POST` | `/api/calendar-events` | Create a manual calendar event. |
+| `GET` | `/api/calendar-events?from=&to=` | List manual calendar events overlapping a time range. |
+| `GET` | `/api/calendar-events/:id` | Get one manual calendar event. |
+| `PATCH` | `/api/calendar-events/:id` | Update one manual calendar event. |
+| `DELETE` | `/api/calendar-events/:id` | Delete one manual calendar event. |
 
 Example registration body:
 
@@ -269,6 +274,18 @@ For a course-environment log, send at least one concern rating or note. `check_i
   "workload_difficulty": 4,
   "unclear_instruction_level": 2,
   "concern_notes": "The implementation workload is high this week."
+}
+```
+
+For a calendar event, send `event_type`, `title`, and `starts_at`. Calendar lists require `from` and `to` ISO timestamps and return events that overlap the requested range. Setting an event to `completed` records the completion time on the server.
+
+```json
+{
+  "event_type": "study_block",
+  "title": "Finish calendar API",
+  "starts_at": "2026-07-14T09:00:00+08:00",
+  "ends_at": "2026-07-14T11:00:00+08:00",
+  "location": "Library"
 }
 ```
 
