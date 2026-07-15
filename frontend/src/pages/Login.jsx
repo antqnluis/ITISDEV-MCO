@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
-import AuthLayout from "../components/AuthLayout";
-import Button from "../components/Button";
-import PageHeader from "../components/PageHeader";
-import PasswordInput from "../components/PasswordInput";
-import TextInput from "../components/TextInput";
+import SplitAuthLayout from "../components/layout/SplitAuthLayout";
+import Button from "../components/ui/Button";
+import PageHeader from "../components/ui/PageHeader";
+import PasswordInput from "../components/ui/PasswordInput";
+import TextInput from "../components/ui/TextInput";
 
 function Login() {
   function handleSubmit(event) {
@@ -15,7 +15,7 @@ function Login() {
   }
 
   return (
-    <AuthLayout>
+    <SplitAuthLayout>
       <div className="w-full max-w-[500px]">
         <PageHeader title="Welcome back" subtitle="Continue your wellness journey." />
 
@@ -64,7 +64,7 @@ function Login() {
           <a href="#privacy" onClick={(event) => event.preventDefault()} className="hover:underline">Privacy Policy</a>.
         </p>
       </div>
-    </AuthLayout>
+    </SplitAuthLayout>
   );
 }
 
