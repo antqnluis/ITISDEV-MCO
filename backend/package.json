@@ -5,6 +5,12 @@
   "main": "server.js",
   "scripts": {
     "test": "node --test",
+    "test:academic-seed": "node scripts/testSeededAcademicEngagement.js",
+    "test:course-environment-seed": "node scripts/testSeededCourseEnvironment.js",
+    "test:logistical-seed": "node scripts/testSeededLogisticalLoad.js",
+    "test:role-seed": "node scripts/testSeededRoleLoad.js",
+    "test:wellbeing-seed": "node scripts/testSeededPersonalWellbeing.js",
+    "seed:demo": "node scripts/seedDemoStudent.js",
     "dev": "nodemon server.js",
     "start": "node server.js"
   },
