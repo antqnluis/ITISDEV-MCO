@@ -43,6 +43,7 @@ function Consent() {
 
   function handleSubmit(event) {
     event.preventDefault();
+    navigate("/onboarding");
   }
 
   return (
