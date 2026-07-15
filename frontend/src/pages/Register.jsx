@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import CenteredAuthLayout from "../components/layout/CenteredAuthLayout";
 import Button from "../components/ui/Button";
 import Logo from "../components/ui/Logo";
@@ -9,8 +10,11 @@ import TextInput from "../components/ui/TextInput";
 const textInputClassName = "h-[61px] w-full rounded-[15px] border border-[#d8e0dc] bg-white px-5 text-lg text-[#10251e] shadow-[0_2px_4px_rgba(32,48,57,0.13)] outline-none transition focus:border-[#4b8360] focus:ring-2 focus:ring-[#4b8360]/20";
 
 function Register() {
+  const navigate = useNavigate();
+
   function handleSubmit(event) {
     event.preventDefault();
+    navigate("/consent");
   }
 
   return (
@@ -87,5 +91,4 @@ function Register() {
     </CenteredAuthLayout>
   );
 }
-
 export default Register;

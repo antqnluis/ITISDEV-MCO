@@ -51,9 +51,10 @@ function Consent() {
         <PageHeader
           title="Privacy & Consent"
           subtitle="Before we get started, we'd like to explain how AnimoLog uses your information."
+          className="text-center"
         />
 
-        <p className="mb-8 text-base leading-7 text-[#59706a]">
+        <p className="mb-6 text-base leading-7 text-[#59706a]">
           Your wellbeing information belongs to you. AnimoLog collects only the information needed to generate personalized wellness insights and recommendations. Your information is kept private and is never automatically shared with faculty, counselors, or administrators.
         </p>
 

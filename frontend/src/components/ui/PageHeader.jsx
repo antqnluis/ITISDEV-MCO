@@ -1,6 +1,10 @@
-function PageHeader({ title, subtitle }) {
+function PageHeader({
+  title,
+  subtitle,
+  className = ""
+}) {
   return (
-    <header className="mb-12">
+    <header className={`mb-12 ${className}`}>
       <h1 className="font-serif text-[42px] font-semibold leading-none tracking-[-0.045em] text-[#10251e] sm:text-[44px]">
         {title}
       </h1>
