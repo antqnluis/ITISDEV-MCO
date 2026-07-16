@@ -31,7 +31,9 @@ test("registerStudent creates the RLS-scoped student record and returns its sess
     const session = createSession();
     const insertedStudent = {
         id: "student-id",
-        student_number: "20240001"
+        student_number: "20240001",
+        first_name: "Jamie",
+        last_name: "Reyes"
     };
     let insertedValues;
 
@@ -75,16 +77,58 @@ test("registerStudent creates the RLS-scoped student record and returns its sess
     const result = await authService.registerStudent({
         email: " Student@Example.com ",
         password: "a secure password",
-        student_number: " 20240001 "
+        student_number: " 20240001 ",
+        first_name: " Jamie ",
+        last_name: " Reyes "
     });
 
     assert.deepEqual(insertedValues, {
         id: "student-id",
-        student_number: "20240001"
+        student_number: "20240001",
+        first_name: "Jamie",
+        last_name: "Reyes"
     });
     assert.equal(result.user.email, "student@example.com");
     assert.deepEqual(result.session, session);
     assert.deepEqual(result.student, insertedStudent);
+});
+
+test("registerStudent validates the required student names before creating an auth user", { concurrency: false }, async () => {
+    let signUpCalled = false;
+    const authService = loadModule(servicePath, {
+        publicSupabase: {
+            auth: {
+                signUp: async () => {
+                    signUpCalled = true;
+                    throw new Error("should not be called");
+                }
+            }
+        },
+        createAuthenticatedSupabaseClient: () => ({}),
+        signOutSession: async () => {}
+    });
+
+    await assert.rejects(
+        authService.registerStudent({
+            email: "student@example.com",
+            password: "password",
+            student_number: "20240001",
+            first_name: " ",
+            last_name: "Reyes"
+        }),
+        (error) => error.statusCode === 400 && error.message === "first_name is required"
+    );
+    await assert.rejects(
+        authService.registerStudent({
+            email: "student@example.com",
+            password: "password",
+            student_number: "20240001",
+            first_name: "Jamie",
+            last_name: "x".repeat(101)
+        }),
+        (error) => error.statusCode === 400 && error.message.includes("last_name")
+    );
+    assert.equal(signUpCalled, false);
 });
 
 test("loginStudent returns a session payload instead of dropping tokens", { concurrency: false }, async () => {
@@ -147,7 +191,9 @@ test("registerStudent reports a configuration error when Supabase does not issue
         authService.registerStudent({
             email: "student@example.com",
             password: "password",
-            student_number: "20240001"
+            student_number: "20240001",
+            first_name: "Jamie",
+            last_name: "Reyes"
         }),
         (error) => error.statusCode === 503
             && error.message.includes("email confirmation")
@@ -174,7 +220,12 @@ test("getCurrentStudent scopes the query to the authenticated student and logout
                         requestedStudentId = value;
                         return {
                             maybeSingle: async () => ({
-                                data: { id: "student-id", student_number: "20240001" },
+                                data: {
+                                    id: "student-id",
+                                    student_number: "20240001",
+                                    first_name: "Jamie",
+                                    last_name: "Reyes"
+                                },
                                 error: null
                             })
                         };
@@ -188,7 +239,12 @@ test("getCurrentStudent scopes the query to the authenticated student and logout
     await authService.logoutStudent("access-token");
 
     assert.equal(requestedStudentId, "student-id");
-    assert.deepEqual(student, { id: "student-id", student_number: "20240001" });
+    assert.deepEqual(student, {
+        id: "student-id",
+        student_number: "20240001",
+        first_name: "Jamie",
+        last_name: "Reyes"
+    });
     assert.equal(signedOutToken, "access-token");
 });
 

@@ -2,6 +2,8 @@ const PROFILE_FIELDS = new Set([
     "college",
     "program",
     "year_level",
+    "current_academic_term",
+    "wellness_goals",
     "commute_minutes_per_day",
     "available_study_hours_per_week",
     "has_caregiving_responsibility",
@@ -41,6 +43,8 @@ const PROFILE_SELECT = [
     "college",
     "program",
     "year_level",
+    "current_academic_term",
+    "wellness_goals",
     "commute_minutes_per_day",
     "available_study_hours_per_week",
     "has_caregiving_responsibility",
@@ -118,7 +122,7 @@ function normalizeProfileInput(payload, { isCreate = false } = {}) {
     }
 
     if (isCreate) {
-        for (const field of ["college", "program", "year_level"]) {
+        for (const field of ["college", "program", "year_level", "current_academic_term"]) {
             if (!hasOwn(payload, field)) {
                 throw createServiceError(`${field} is required`);
             }
@@ -138,6 +142,28 @@ function normalizeProfileInput(payload, { isCreate = false } = {}) {
                 throw createServiceError("year_level must be an integer between 1 and 6");
             }
             normalized[field] = value;
+            continue;
+        }
+
+        if (field === "current_academic_term") {
+            if (!Number.isInteger(value) || value < 1 || value > 3) {
+                throw createServiceError("current_academic_term must be an integer between 1 and 3");
+            }
+            normalized[field] = value;
+            continue;
+        }
+
+        if (field === "wellness_goals") {
+            if (!Array.isArray(value) || value.length > 10) {
+                throw createServiceError("wellness_goals must be an array with at most 10 items");
+            }
+
+            normalized[field] = value.map((goal) => {
+                if (typeof goal !== "string" || goal.trim().length === 0) {
+                    throw createServiceError("wellness_goals must contain only non-empty strings");
+                }
+                return goal.trim();
+            });
             continue;
         }
 
@@ -173,6 +199,10 @@ function normalizeProfileInput(payload, { isCreate = false } = {}) {
         if (field === "additional_context") {
             normalized[field] = normalizeOptionalText(value, field, 2000);
         }
+    }
+
+    if (isCreate && !hasOwn(payload, "wellness_goals")) {
+        normalized.wellness_goals = [];
     }
 
     return normalized;

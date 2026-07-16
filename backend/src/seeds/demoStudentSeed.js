@@ -26,6 +26,11 @@ const IDS = Object.freeze({
         "50000000-0000-4000-8000-000000000002",
         "50000000-0000-4000-8000-000000000003"
     ]),
+    dimensionScores: Object.freeze([
+        "70000000-0000-4000-8000-000000000001",
+        "70000000-0000-4000-8000-000000000002",
+        "70000000-0000-4000-8000-000000000003"
+    ]),
     aiResults: Object.freeze([
         "60000000-0000-4000-8000-000000000001",
         "60000000-0000-4000-8000-000000000002",
@@ -40,6 +45,7 @@ const APPLICATION_TABLES = Object.freeze([
     "academic_records",
     "calendar_events",
     "course_environment_logs",
+    "wellness_dimension_scores",
     "ai_results"
 ]);
 
@@ -180,6 +186,8 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
     const students = [{
         id: studentId,
         student_number: studentNumber,
+        first_name: "Demo",
+        last_name: "Student",
         consent_given: true,
         consented_at: timestampAt(anchor, -20, "18:30:00"),
         privacy_notice_version: "v1.0"
@@ -191,6 +199,8 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
         college: "College of Computer Studies",
         program: "BS Information Technology",
         year_level: 3,
+        current_academic_term: 1,
+        wellness_goals: ["Managing Stress", "Managing Workload", "Better Sleep"],
         commute_minutes_per_day: 90,
         available_study_hours_per_week: 8,
         has_caregiving_responsibility: true,
@@ -466,38 +476,62 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
         }
     ];
 
+    const wellnessDimensionScores = [
+        {
+            id: IDS.dimensionScores[0], student_id: studentId, check_in_id: IDS.checkIns[0],
+            academic_engagement_score: 35, personal_wellbeing_score: 38,
+            logistical_load_score: 58, role_load_score: 66, course_environment_score: 30,
+            calculation_method: "rule_based", calculation_version: "1.0",
+            calculated_at: timestampAt(anchor, -14, "20:00:00")
+        },
+        {
+            id: IDS.dimensionScores[1], student_id: studentId, check_in_id: IDS.checkIns[1],
+            academic_engagement_score: 82, personal_wellbeing_score: 70,
+            logistical_load_score: 68, role_load_score: 76, course_environment_score: 72,
+            calculation_method: "rule_based", calculation_version: "1.0",
+            calculated_at: timestampAt(anchor, -7, "21:15:00")
+        },
+        {
+            id: IDS.dimensionScores[2], student_id: studentId, check_in_id: IDS.checkIns[2],
+            academic_engagement_score: 91, personal_wellbeing_score: 92,
+            logistical_load_score: 82, role_load_score: 94, course_environment_score: 81,
+            calculation_method: "rule_based", calculation_version: "1.0",
+            calculated_at: timestampAt(anchor, 0, "07:00:00")
+        }
+    ];
+
     const aiResults = [
         {
             id: IDS.aiResults[0], student_id: studentId, check_in_id: IDS.checkIns[0],
+            dimension_scores_id: IDS.dimensionScores[0],
             swi_score: 48, risk_category: "moderate", stress_severity_level: "moderate",
-            primary_stress_context: "role_load", academic_engagement_score: 35, personal_wellbeing_score: 38,
-            logistical_load_score: 58, role_load_score: 66, course_environment_score: 30,
+            primary_stress_context: "role_load",
             reflection_keywords: ["requirements", "training", "work", "manageable"],
             weekly_summary: "The student is managing early midterm pressure, but overlapping employment, athletics, OJT, organization, and caregiving roles are reducing schedule flexibility.",
             recommendations: [
                 { "priority": "medium", "action": "Reserve two protected study blocks before requirements become urgent." },
                 { "priority": "medium", "action": "Delegate one organization preparation task to another officer." }
             ],
-            analysis_method: "rule_based", analysis_version: "1.0", generated_at: timestampAt(anchor, -14, "20:05:00")
+            analysis_method: "rag_assisted", analysis_version: "1.0", generated_at: timestampAt(anchor, -14, "20:05:00")
         },
         {
             id: IDS.aiResults[1], student_id: studentId, check_in_id: IDS.checkIns[1],
+            dimension_scores_id: IDS.dimensionScores[1],
             swi_score: 73, risk_category: "high", stress_severity_level: "severe",
-            primary_stress_context: "academic_engagement", academic_engagement_score: 82, personal_wellbeing_score: 70,
-            logistical_load_score: 68, role_load_score: 76, course_environment_score: 72,
+            primary_stress_context: "academic_engagement",
             reflection_keywords: ["late", "missed", "practice", "approval"],
             weekly_summary: "A late submission and a missed exercise indicate that the combined midterm and role load is beginning to affect academic engagement and recovery.",
             recommendations: [
                 { "priority": "high", "action": "Contact the database instructor about recovery options for the missed exercise." },
                 { "priority": "high", "action": "Reduce or swap one work or training commitment this week." }
             ],
-            analysis_method: "rule_based", analysis_version: "1.0", generated_at: timestampAt(anchor, -7, "21:20:00")
+            analysis_method: "rag_assisted", analysis_version: "1.0", generated_at: timestampAt(anchor, -7, "21:20:00")
         },
         {
             id: IDS.aiResults[2], student_id: studentId, check_in_id: IDS.checkIns[2],
+            dimension_scores_id: IDS.dimensionScores[2],
             swi_score: 89, risk_category: "high", stress_severity_level: "critical",
-            primary_stress_context: "mixed", academic_engagement_score: 91, personal_wellbeing_score: 92,
-            logistical_load_score: 82, role_load_score: 94, course_environment_score: 81,
+            primary_stress_context: "mixed",
             reflection_keywords: ["heaviest", "exams", "deadlines", "working", "training", "caregiving", "vice president"],
             weekly_summary: "Critical midterm stress is driven by urgent academic requirements, very limited study time, poor sleep, and simultaneous work, OJT, athletics, caregiving, and leadership commitments.",
             recommendations: [
@@ -505,7 +539,7 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
                 { "priority": "urgent", "action": "Ask instructors and teammates for deadline or workload support before the upcoming exams." },
                 { "priority": "high", "action": "Delegate assembly logistics to organization officers and discuss a work-shift adjustment." }
             ],
-            analysis_method: "rule_based", analysis_version: "1.0", generated_at: timestampAt(anchor, 0, "07:05:00")
+            analysis_method: "rag_assisted", analysis_version: "1.0", generated_at: timestampAt(anchor, 0, "07:05:00")
         }
     ];
 
@@ -518,6 +552,7 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             academic_records: academicRecords,
             calendar_events: calendarEvents,
             course_environment_logs: courseEnvironmentLogs,
+            wellness_dimension_scores: wellnessDimensionScores,
             ai_results: aiResults
         }
     };

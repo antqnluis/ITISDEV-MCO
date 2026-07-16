@@ -76,9 +76,14 @@ test("buildDemoStudentScenario covers every table, data field, enum, and relatio
             academic_records: 8,
             calendar_events: 12,
             course_environment_logs: 3,
+            wellness_dimension_scores: 3,
             ai_results: 3
         }
     );
+
+    const student = scenario.tables.students[0];
+    assert.equal(student.first_name, "Demo");
+    assert.equal(student.last_name, "Student");
 
     const profile = scenario.tables.student_profiles[0];
     for (const flag of [
@@ -91,6 +96,8 @@ test("buildDemoStudentScenario covers every table, data field, enum, and relatio
         assert.equal(profile[flag], true);
     }
     assert.equal(profile.organization_role, "Vice President");
+    assert.equal(profile.current_academic_term, 1);
+    assert.deepEqual(profile.wellness_goals, ["Managing Stress", "Managing Workload", "Better Sleep"]);
     assert.match(profile.additional_context, /midterm/i);
 
     const recordTypes = new Set(scenario.tables.academic_records.map((record) => record.record_type));
@@ -159,10 +166,10 @@ test("buildDemoStudentScenario covers every table, data field, enum, and relatio
         }
         assert.equal(event.status === "completed", event.completed_at !== null);
     }
-    for (const result of scenario.tables.ai_results) {
-        assert.ok(checkInIds.has(result.check_in_id));
-        assert.ok(result.reflection_keywords.length > 0);
-        assert.ok(result.recommendations.length > 0);
+    const dimensionScoresById = new Map();
+    for (const scores of scenario.tables.wellness_dimension_scores) {
+        assert.ok(checkInIds.has(scores.check_in_id));
+        assert.equal(scores.calculation_method, "rule_based");
         for (const field of [
             "academic_engagement_score",
             "personal_wellbeing_score",
@@ -170,8 +177,19 @@ test("buildDemoStudentScenario covers every table, data field, enum, and relatio
             "role_load_score",
             "course_environment_score"
         ]) {
-            assert.ok(result[field] >= 0 && result[field] <= 100);
+            assert.ok(scores[field] >= 0 && scores[field] <= 100);
         }
+        dimensionScoresById.set(scores.id, scores);
+    }
+    for (const result of scenario.tables.ai_results) {
+        assert.ok(checkInIds.has(result.check_in_id));
+        assert.ok(result.reflection_keywords.length > 0);
+        assert.ok(result.recommendations.length > 0);
+        assert.equal(result.analysis_method, "rag_assisted");
+        const scores = dimensionScoresById.get(result.dimension_scores_id);
+        assert.ok(scores);
+        assert.equal(scores.student_id, result.student_id);
+        assert.equal(scores.check_in_id, result.check_in_id);
         const expectedRisk = result.swi_score < 40
             ? "low"
             : result.swi_score < 70 ? "moderate" : "high";
