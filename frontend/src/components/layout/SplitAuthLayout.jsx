@@ -1,3 +1,5 @@
+import Logo from "../ui/Logo";
+
 function WellnessIllustration() {
   return (
     <svg
@@ -37,7 +39,7 @@ function WellnessIllustration() {
   );
 }
 
-function AuthLayout({ children }) {
+function SplitAuthLayout({ children }) {
   return (
     <main className="min-h-screen bg-[#fdfcf9] lg:grid lg:grid-cols-[minmax(420px,42%)_1fr]">
       <aside className="relative hidden min-h-screen overflow-hidden bg-[#e6f2e4] lg:block">
@@ -54,5 +56,4 @@ function AuthLayout({ children }) {
   );
 }
 
-export default AuthLayout;
-import Logo from "./Logo";
+export default SplitAuthLayout;
