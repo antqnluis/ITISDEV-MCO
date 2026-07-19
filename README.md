@@ -60,7 +60,7 @@
    cp .env.example .env
    ```
 
-   Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `backend/.env`. The anon key is used for authentication and all student-scoped requests so Supabase row-level security applies. Set `SUPABASE_SERVICE_ROLE_KEY` only when running a trusted academic-record import; never expose it to clients.
+   Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `backend/.env`. The anon key is used for authentication and all student-scoped requests so Supabase row-level security applies. Set the server-only `SUPABASE_SERVICE_ROLE_KEY` for trusted operations such as wellness-dimension calculation and academic-record imports; never expose it to clients.
 
    The server uses port `9999` by default. To change it, add `PORT=your_port` to `backend/.env`.
 
@@ -198,6 +198,7 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `PATCH` | `/api/profile` | Update the authenticated student's profile. |
 | `DELETE` | `/api/profile` | Delete the authenticated student's profile. |
 | `POST` | `/api/check-ins` | Create a weekly check-in. |
+| `POST` | `/api/check-ins/:id/calculate-dimensions` | Calculate and store all five wellness dimensions for one check-in. |
 | `GET` | `/api/check-ins` | List the authenticated student's check-ins, newest first. |
 | `GET` | `/api/check-ins/:id` | Get one weekly check-in. |
 | `PATCH` | `/api/check-ins/:id` | Update one weekly check-in. |
@@ -217,6 +218,22 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `GET` | `/api/calendar-events/:id` | Get one manual calendar event. |
 | `PATCH` | `/api/calendar-events/:id` | Update one manual calendar event. |
 | `DELETE` | `/api/calendar-events/:id` | Delete one manual calendar event. |
+| `GET` | `/api/wellness-dimension-scores` | List the authenticated student's calculated dimension scores. |
+| `GET` | `/api/wellness-dimension-scores/:id` | Get one calculated dimension-score record. |
+
+Wellness dimension scores are read-only for authenticated students. The list endpoint returns the newest calculations first and accepts `limit` (1–100, default 25), `offset` (default 0), optional `check_in_id`, and optional `calculation_method` (`rule_based`, `machine_learning`, or `hybrid`). For example:
+
+```text
+GET /api/wellness-dimension-scores?check_in_id=CHECK_IN_UUID&calculation_method=rule_based&limit=25&offset=0
+```
+
+After the student has a profile, a weekly check-in, and rated course-environment data for that check-in's week, calculate the dimensions with an authenticated request:
+
+```text
+POST /api/check-ins/CHECK_IN_UUID/calculate-dimensions
+```
+
+The request has no body. The backend loads the student's source data, runs all five rule-based calculators, and returns the stored `wellnessDimensionScore`. Repeating the request recalculates and replaces the score values for that check-in without creating a duplicate. If any dimension lacks enough data to produce a score, the backend returns `409` and stores nothing. `SUPABASE_SERVICE_ROLE_KEY` must be configured on the backend for this operation.
 
 Example registration body:
 
@@ -224,9 +241,13 @@ Example registration body:
 {
   "email": "student1@example.com",
   "password": "password123",
-  "student_number": "20240001"
+  "student_number": "20240001",
+  "first_name": "Jamie",
+  "last_name": "Reyes"
 }
 ```
+
+`first_name` and `last_name` are required, are trimmed by the backend, and may contain up to 100 characters each. Registration and `GET /api/auth/me` return both fields in the student record.
 
 To accept the privacy notice, send this authenticated request body to `PATCH /api/consent`:
 
@@ -238,15 +259,23 @@ To accept the privacy notice, send this authenticated request body to `PATCH /ap
 
 The backend records the acceptance timestamp and privacy notice version `v1.0`.
 
-For a profile request, the minimum JSON body is:
+For a profile request, send:
 
 ```json
 {
   "college": "College of Computer Studies",
   "program": "BS Information Technology",
-  "year_level": 3
+  "year_level": 3,
+  "current_academic_term": 1,
+  "wellness_goals": [
+    "Managing Stress",
+    "Managing Workload",
+    "Better Sleep"
+  ]
 }
 ```
+
+`current_academic_term` is required when creating a profile and must be `1`, `2`, or `3`. `wellness_goals` is optional, defaults to an empty array, and accepts at most 10 non-empty strings. Both fields may be changed with `PATCH /api/profile`.
 
 For a weekly check-in, send:
 
