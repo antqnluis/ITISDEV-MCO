@@ -89,6 +89,7 @@ function ResponsibilityHoursList({
                     value={otherResponsibility}
                     onChange={(event) => onOtherResponsibilityChange(event.target.value)}
                     placeholder="Enter another responsibility"
+                    maxLength={200}
                     error={otherResponsibilityError}
                     required
                   />

@@ -7,6 +7,7 @@ import SelectionCard from "../components/onboarding/SelectionCard";
 import Button from "../components/ui/Button";
 import PageHeader from "../components/ui/PageHeader";
 import SelectInput from "../components/ui/SelectInput";
+import { usePrototypeData } from "../context/usePrototypeData";
 
 const totalSteps = 5;
 
@@ -132,39 +133,64 @@ function buildResponsibilityProfilePayload(
   return payload;
 }
 
+function buildProfilePayload(academics, selectedResponsibilities, responsibilityHours, otherResponsibility, selectedGoals) {
+  return {
+    college: academics.college.trim(),
+    program: academics.program.trim(),
+    year_level: Number(academics.year_level),
+    current_academic_term: Number(academics.current_academic_term),
+    wellness_goals: selectedGoals,
+    commute_minutes_per_day: 0,
+    available_study_hours_per_week: 0,
+    organization_role: null,
+    ...buildResponsibilityProfilePayload(
+      selectedResponsibilities,
+      responsibilityHours,
+      otherResponsibility
+    )
+  };
+}
+
 function Onboarding() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isPrivacyNoticeOpen, setIsPrivacyNoticeOpen] = useState(true);
   const [academics, setAcademics] = useState({
     college: "",
     program: "",
-    yearLevel: "",
-    academicTerm: ""
+    year_level: "",
+    current_academic_term: ""
   });
+  const [academicErrors, setAcademicErrors] = useState({});
   const [selectedResponsibilities, setSelectedResponsibilities] = useState([]);
   const [responsibilityHours, setResponsibilityHours] = useState({});
   const [responsibilityErrors, setResponsibilityErrors] = useState({});
   const [otherResponsibility, setOtherResponsibility] = useState("");
   const [otherResponsibilityError, setOtherResponsibilityError] = useState("");
-  const [responsibilityProfilePayload, setResponsibilityProfilePayload] = useState(null);
   const [selectedGoals, setSelectedGoals] = useState([]);
   const [isComplete, setIsComplete] = useState(false);
   const navigate = useNavigate();
+  const { profile, student, updateSettings } = usePrototypeData();
 
   function goToNextStep() {
+    if (currentStep === 2 && !validateAcademicsStep()) {
+      return;
+    }
+
     if (currentStep === 3) {
       if (!validateResponsibilitiesStep()) {
         return;
       }
-
-      setResponsibilityProfilePayload(buildResponsibilityProfilePayload(
-        selectedResponsibilities,
-        responsibilityHours,
-        otherResponsibility
-      ));
     }
 
     if (currentStep === totalSteps) {
+      const profilePayload = buildProfilePayload(
+        academics,
+        selectedResponsibilities,
+        responsibilityHours,
+        otherResponsibility,
+        selectedGoals
+      );
+      updateSettings(student, { ...profile, ...profilePayload });
       setIsComplete(true);
       return;
     }
@@ -179,6 +205,7 @@ function Onboarding() {
   function updateAcademicField(event) {
     const { name, value } = event.target;
     setAcademics((currentAcademics) => ({ ...currentAcademics, [name]: value }));
+    setAcademicErrors((currentErrors) => ({ ...currentErrors, [name]: undefined }));
   }
 
   function toggleSelection(value, setSelection) {
@@ -208,7 +235,6 @@ function Onboarding() {
       }
     }
 
-    setResponsibilityProfilePayload(null);
   }
 
   function updateResponsibilityHours(responsibilityId, value) {
@@ -228,7 +254,6 @@ function Onboarding() {
         ? { ...currentErrors, [responsibilityId]: nextError }
         : omitKey(currentErrors, responsibilityId);
     });
-    setResponsibilityProfilePayload(null);
   }
 
   function updateOtherResponsibility(value) {
@@ -237,8 +262,30 @@ function Onboarding() {
     if (value.trim()) {
       setOtherResponsibilityError("");
     }
+  }
 
-    setResponsibilityProfilePayload(null);
+  function validateAcademicsStep() {
+    const nextErrors = {};
+
+    if (!academics.college.trim()) nextErrors.college = "Select your college.";
+    if (!academics.program.trim()) nextErrors.program = "Select your program.";
+    if (!academics.year_level) nextErrors.year_level = "Select your year level.";
+    if (!academics.current_academic_term) nextErrors.current_academic_term = "Select your academic term.";
+
+    setAcademicErrors(nextErrors);
+
+    const firstInvalidField = Object.keys(nextErrors)[0];
+    if (firstInvalidField) {
+      const fieldIds = {
+        college: "college",
+        program: "program",
+        year_level: "year-level",
+        current_academic_term: "academic-term"
+      };
+      requestAnimationFrame(() => document.getElementById(fieldIds[firstInvalidField])?.focus());
+    }
+
+    return Object.keys(nextErrors).length === 0;
   }
 
   function validateResponsibilitiesStep() {
@@ -280,9 +327,7 @@ function Onboarding() {
   }
 
   function goToDashboard() {
-    navigate("/dashboard", {
-      state: { responsibilityProfilePayload }
-    });
+    navigate("/dashboard");
   }
 
   function renderStep() {
@@ -339,7 +384,7 @@ function Onboarding() {
         <div>
           <PageHeader compact title="Tell us about your academics" />
           <div className="grid gap-5 sm:grid-cols-2">
-            <SelectInput id="college" label="College" name="college" value={academics.college} onChange={updateAcademicField}>
+            <SelectInput id="college" label="College" name="college" required value={academics.college} onChange={updateAcademicField} error={academicErrors.college}>
                 <option value="">Select your college</option>
                 <option>College of Computer Studies</option>
                 <option>College of Engineering</option>
@@ -347,23 +392,22 @@ function Onboarding() {
                 <option>College of Business</option>
                 <option>College of Liberal Arts</option>
             </SelectInput>
-            <SelectInput id="program" label="Program" name="program" value={academics.program} onChange={updateAcademicField}>
+            <SelectInput id="program" label="Program" name="program" required value={academics.program} onChange={updateAcademicField} error={academicErrors.program}>
                 <option value="">Select your program</option>
                 <option>BS Information Technology</option>
                 <option>BS Computer Science</option>
                 <option>BS Information Systems</option>
                 <option>Other</option>
             </SelectInput>
-            <SelectInput id="year-level" label="Current Year Level" name="yearLevel" value={academics.yearLevel} onChange={updateAcademicField}>
+            <SelectInput id="year-level" label="Current Year Level" name="year_level" required value={academics.year_level} onChange={updateAcademicField} error={academicErrors.year_level}>
                 <option value="">Select your year level</option>
-                {[1, 2, 3, 4, 5].map((year) => <option key={year} value={year}>Year {year}</option>)}
+                {[1, 2, 3, 4, 5, 6].map((year) => <option key={year} value={year}>Year {year}</option>)}
             </SelectInput>
-            <SelectInput id="academic-term" label="Current Academic Term" name="academicTerm" value={academics.academicTerm} onChange={updateAcademicField}>
+            <SelectInput id="academic-term" label="Current Academic Term" name="current_academic_term" required value={academics.current_academic_term} onChange={updateAcademicField} error={academicErrors.current_academic_term}>
                 <option value="">Select your academic term</option>
-                <option>Term 1</option>
-                <option>Term 2</option>
-                <option>Term 3</option>
-                <option>Summer Term</option>
+                <option value="1">Term 1</option>
+                <option value="2">Term 2</option>
+                <option value="3">Term 3</option>
             </SelectInput>
           </div>
         </div>
