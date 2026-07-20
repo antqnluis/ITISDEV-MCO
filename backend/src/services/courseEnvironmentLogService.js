@@ -1,3 +1,5 @@
+const { normalizeMondayDate } = require("../utils/weekDate");
+
 const COURSE_ENVIRONMENT_LOG_FIELDS = new Set([
     "check_in_id",
     "course_code",
@@ -68,24 +70,6 @@ function normalizeRequiredText(value, fieldName) {
     return value.trim();
 }
 
-function normalizeDate(value, fieldName = "week_start") {
-    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        throw createServiceError(`${fieldName} must be a valid date in YYYY-MM-DD format`);
-    }
-
-    const [year, month, day] = value.split("-").map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    if (
-        date.getUTCFullYear() !== year
-        || date.getUTCMonth() !== month - 1
-        || date.getUTCDate() !== day
-    ) {
-        throw createServiceError(`${fieldName} must be a valid date in YYYY-MM-DD format`);
-    }
-
-    return value;
-}
-
 function normalizePaginationValue(value, fieldName, defaultValue, minimum, maximum) {
     if (value === undefined) {
         return defaultValue;
@@ -135,7 +119,7 @@ function normalizeLogInput(payload, { isCreate = false } = {}) {
         }
 
         if (field === "week_start") {
-            normalized[field] = normalizeDate(value);
+            normalized[field] = normalizeMondayDate(value);
             continue;
         }
 
@@ -194,7 +178,7 @@ function normalizeListOptions(query = {}) {
     return {
         limit: normalizePaginationValue(query.limit, "limit", 25, 1, 100),
         offset: normalizePaginationValue(query.offset, "offset", 0, 0, 100000),
-        weekStart: query.week_start === undefined ? null : normalizeDate(query.week_start),
+        weekStart: query.week_start === undefined ? null : normalizeMondayDate(query.week_start),
         courseCode: query.course_code === undefined
             ? null
             : normalizeRequiredText(query.course_code, "course_code"),

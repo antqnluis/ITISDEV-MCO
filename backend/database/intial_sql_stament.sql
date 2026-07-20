@@ -262,6 +262,11 @@ create table public.weekly_check_ins (
     constraint weekly_check_ins_student_week_unique
         unique (student_id, week_start),
 
+    constraint weekly_check_ins_week_start_monday
+        check (
+            extract(isodow from week_start) = 1
+        ),
+
     -- Supports composite foreign keys so that child records
     -- cannot reference a check-in owned by another student.
     constraint weekly_check_ins_id_student_unique
@@ -610,6 +615,11 @@ create table public.course_environment_logs (
             student_id,
             course_code,
             week_start
+        ),
+
+    constraint course_environment_week_start_monday
+        check (
+            extract(isodow from week_start) = 1
         ),
 
     constraint course_environment_course_code_not_blank

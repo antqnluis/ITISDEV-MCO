@@ -25,6 +25,20 @@ async function list(req, res) {
     }
 }
 
+async function current(req, res) {
+    try {
+        const result = await weeklyCheckInService.getCurrentCheckIn(req.supabase, req.user.id);
+        return res.status(200).json({
+            success: true,
+            weekStart: result.weekStart,
+            completed: result.checkIn !== null,
+            checkIn: result.checkIn
+        });
+    } catch (error) {
+        return sendError(res, error);
+    }
+}
+
 async function get(req, res) {
     try {
         const checkIn = await weeklyCheckInService.getCheckIn(req.supabase, req.user.id, req.params.id);
@@ -55,6 +69,7 @@ async function remove(req, res) {
 module.exports = {
     create,
     list,
+    current,
     get,
     update,
     remove

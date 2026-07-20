@@ -57,6 +57,7 @@ CREATE TABLE public.weekly_check_ins (
   submitted_at timestamp with time zone NOT NULL DEFAULT now(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT weekly_check_ins_week_start_monday CHECK (EXTRACT(isodow FROM week_start) = 1),
   CONSTRAINT weekly_check_ins_pkey PRIMARY KEY (id),
   CONSTRAINT weekly_check_ins_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
@@ -120,6 +121,7 @@ CREATE TABLE public.course_environment_logs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT course_environment_week_start_monday CHECK (EXTRACT(isodow FROM week_start) = 1),
   CONSTRAINT course_environment_logs_pkey PRIMARY KEY (id),
   CONSTRAINT course_environment_logs_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
   CONSTRAINT course_environment_check_in_student_fk FOREIGN KEY (check_in_id) REFERENCES public.weekly_check_ins(id),

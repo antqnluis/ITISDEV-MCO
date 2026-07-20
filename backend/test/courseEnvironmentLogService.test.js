@@ -80,6 +80,13 @@ test("createCourseEnvironmentLog validates input and assigns the authenticated s
     );
     await assert.rejects(
         createCourseEnvironmentLog({}, studentId, {
+            ...validPayload,
+            week_start: "2026-07-07"
+        }),
+        (error) => error.statusCode === 400 && error.message === "week_start must be a Monday"
+    );
+    await assert.rejects(
+        createCourseEnvironmentLog({}, studentId, {
             course_code: "ITISDEV",
             course_name: "IT Systems Development",
             week_start: "2026-07-06"
