@@ -198,6 +198,7 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `PATCH` | `/api/profile` | Update the authenticated student's profile. |
 | `DELETE` | `/api/profile` | Delete the authenticated student's profile. |
 | `POST` | `/api/check-ins` | Create a weekly check-in. |
+| `GET` | `/api/check-ins/current` | Get the authenticated student's current Manila-week check-in status. |
 | `POST` | `/api/check-ins/:id/calculate-dimensions` | Calculate and store all five wellness dimensions for one check-in. |
 | `GET` | `/api/check-ins` | List the authenticated student's check-ins, newest first. |
 | `GET` | `/api/check-ins/:id` | Get one weekly check-in. |
@@ -258,6 +259,9 @@ To accept the privacy notice, send this authenticated request body to `PATCH /ap
 ```
 
 The backend records the acceptance timestamp and privacy notice version `v1.0`.
+All profile, check-in, academic-record, course-environment, calendar-event, and
+wellness-dimension-score endpoints require acceptance of the current privacy notice.
+An authenticated student who has not accepted it receives `403 Current privacy consent is required`.
 
 For a profile request, send:
 
@@ -292,6 +296,11 @@ For a weekly check-in, send:
   "reflection": "Several deadlines are due this week."
 }
 ```
+
+`week_start` must be a Monday. The same Monday requirement applies to
+course-environment logs so that weekly source records align with their check-in.
+`GET /api/check-ins/current` determines the current Monday in `Asia/Manila` and returns
+`completed: false` with `checkIn: null` when the student has not submitted that week.
 
 For a course-environment log, send at least one concern rating or note. `check_in_id` is optional and must reference one of the authenticated student's weekly check-ins.
 
