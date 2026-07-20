@@ -2,23 +2,48 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CenteredAuthLayout from "../components/layout/CenteredAuthLayout";
 import ProgressIndicator from "../components/onboarding/ProgressIndicator";
+import ResponsibilityHoursList from "../components/onboarding/ResponsibilityHoursList";
 import SelectionCard from "../components/onboarding/SelectionCard";
 import Button from "../components/ui/Button";
 import PageHeader from "../components/ui/PageHeader";
 import SelectInput from "../components/ui/SelectInput";
-import TextInput from "../components/ui/TextInput";
 
 const totalSteps = 5;
 
 const responsibilities = [
-  "Student Organization",
-  "Athlete",
-  "OJT / Internship",
-  "Part-time Job",
-  "Caregiving",
-  "Scholarship",
-  "Leadership Role",
-  "Other"
+  {
+    id: "organization",
+    label: "Student Organization",
+    booleanField: "has_organization_responsibility",
+    hoursField: "organization_hours_per_week"
+  },
+  {
+    id: "athlete",
+    label: "Athlete",
+    booleanField: "is_athlete",
+    hoursField: "athlete_hours_per_week"
+  },
+  {
+    id: "ojt",
+    label: "OJT / Internship",
+    booleanField: "has_ojt",
+    hoursField: "ojt_hours_per_week"
+  },
+  {
+    id: "employment",
+    label: "Part-time Job",
+    booleanField: "is_employed",
+    hoursField: "work_hours_per_week"
+  },
+  {
+    id: "caregiving",
+    label: "Caregiving",
+    booleanField: "has_caregiving_responsibility",
+    hoursField: "caregiving_hours_per_week"
+  },
+  { id: "scholarship", label: "Scholarship", contextOnly: true },
+  { id: "leadership", label: "Leadership Role", contextOnly: true },
+  { id: "other", label: "Other", contextOnly: true }
 ];
 
 const wellnessGoals = [
@@ -33,6 +58,80 @@ const wellnessGoals = [
 
 const calendarItems = ["Classes", "Deadlines", "Exams", "Study Blocks"];
 
+function omitKey(object, keyToOmit) {
+  return Object.fromEntries(
+    Object.entries(object).filter(([key]) => key !== keyToOmit)
+  );
+}
+
+function validateResponsibilityHours(value) {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return "Enter the hours you spend on this responsibility each week.";
+  }
+
+  const numericValue = Number(normalizedValue);
+
+  if (!Number.isFinite(numericValue)) {
+    return "Enter a valid number of hours.";
+  }
+
+  if (numericValue < 0 || numericValue > 168) {
+    return "Hours must be between 0 and 168.";
+  }
+
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalizedValue)) {
+    return "Use no more than two decimal places.";
+  }
+
+  return "";
+}
+
+function getResponsibilityHoursTotal(selectedResponsibilities, responsibilityHours) {
+  const total = selectedResponsibilities.reduce((currentTotal, responsibilityId) => {
+    const value = responsibilityHours[responsibilityId] ?? "";
+
+    return validateResponsibilityHours(value)
+      ? currentTotal
+      : currentTotal + Number(value);
+  }, 0);
+
+  return Number(total.toFixed(2));
+}
+
+function buildResponsibilityProfilePayload(
+  selectedResponsibilities,
+  responsibilityHours,
+  otherResponsibility
+) {
+  const payload = {};
+
+  responsibilities
+    .filter(({ booleanField }) => booleanField)
+    .forEach(({ booleanField, hoursField, id }) => {
+      const isSelected = selectedResponsibilities.includes(id);
+      payload[booleanField] = isSelected;
+      payload[hoursField] = isSelected ? Number(responsibilityHours[id]) : 0;
+    });
+
+  const additionalResponsibilities = responsibilities
+    .filter(({ contextOnly, id }) => contextOnly && selectedResponsibilities.includes(id))
+    .map(({ id, label }) => {
+      const responsibilityLabel = id === "other"
+        ? `${label} (${otherResponsibility.trim()})`
+        : label;
+
+      return `${responsibilityLabel}: ${Number(responsibilityHours[id])} hours/week`;
+    });
+
+  payload.additional_context = additionalResponsibilities.length > 0
+    ? `Recurring responsibilities: ${additionalResponsibilities.join("; ")}`
+    : null;
+
+  return payload;
+}
+
 function Onboarding() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isPrivacyNoticeOpen, setIsPrivacyNoticeOpen] = useState(true);
@@ -43,12 +142,28 @@ function Onboarding() {
     academicTerm: ""
   });
   const [selectedResponsibilities, setSelectedResponsibilities] = useState([]);
+  const [responsibilityHours, setResponsibilityHours] = useState({});
+  const [responsibilityErrors, setResponsibilityErrors] = useState({});
   const [otherResponsibility, setOtherResponsibility] = useState("");
+  const [otherResponsibilityError, setOtherResponsibilityError] = useState("");
+  const [responsibilityProfilePayload, setResponsibilityProfilePayload] = useState(null);
   const [selectedGoals, setSelectedGoals] = useState([]);
   const [isComplete, setIsComplete] = useState(false);
   const navigate = useNavigate();
 
   function goToNextStep() {
+    if (currentStep === 3) {
+      if (!validateResponsibilitiesStep()) {
+        return;
+      }
+
+      setResponsibilityProfilePayload(buildResponsibilityProfilePayload(
+        selectedResponsibilities,
+        responsibilityHours,
+        otherResponsibility
+      ));
+    }
+
     if (currentStep === totalSteps) {
       setIsComplete(true);
       return;
@@ -74,6 +189,102 @@ function Onboarding() {
     ));
   }
 
+  function toggleResponsibility(responsibilityId) {
+    const isSelected = selectedResponsibilities.includes(responsibilityId);
+
+    setSelectedResponsibilities((currentSelection) => (
+      isSelected
+        ? currentSelection.filter((item) => item !== responsibilityId)
+        : [...currentSelection, responsibilityId]
+    ));
+
+    if (isSelected) {
+      setResponsibilityHours((currentHours) => omitKey(currentHours, responsibilityId));
+      setResponsibilityErrors((currentErrors) => omitKey(currentErrors, responsibilityId));
+
+      if (responsibilityId === "other") {
+        setOtherResponsibility("");
+        setOtherResponsibilityError("");
+      }
+    }
+
+    setResponsibilityProfilePayload(null);
+  }
+
+  function updateResponsibilityHours(responsibilityId, value) {
+    setResponsibilityHours((currentHours) => ({
+      ...currentHours,
+      [responsibilityId]: value
+    }));
+
+    setResponsibilityErrors((currentErrors) => {
+      if (!currentErrors[responsibilityId]) {
+        return currentErrors;
+      }
+
+      const nextError = validateResponsibilityHours(value);
+
+      return nextError
+        ? { ...currentErrors, [responsibilityId]: nextError }
+        : omitKey(currentErrors, responsibilityId);
+    });
+    setResponsibilityProfilePayload(null);
+  }
+
+  function updateOtherResponsibility(value) {
+    setOtherResponsibility(value);
+
+    if (value.trim()) {
+      setOtherResponsibilityError("");
+    }
+
+    setResponsibilityProfilePayload(null);
+  }
+
+  function validateResponsibilitiesStep() {
+    const nextErrors = {};
+    let firstInvalidFieldId = "";
+
+    responsibilities
+      .filter(({ id }) => selectedResponsibilities.includes(id))
+      .forEach(({ id }) => {
+        const error = validateResponsibilityHours(responsibilityHours[id] ?? "");
+
+        if (error) {
+          nextErrors[id] = error;
+
+          if (!firstInvalidFieldId) {
+            firstInvalidFieldId = `${id}-hours-per-week`;
+          }
+        }
+
+        if (id === "other" && !otherResponsibility.trim() && !firstInvalidFieldId) {
+          firstInvalidFieldId = "other-responsibility";
+        }
+      });
+
+    const nextOtherError = selectedResponsibilities.includes("other") && !otherResponsibility.trim()
+      ? "Describe this responsibility."
+      : "";
+
+    setResponsibilityErrors(nextErrors);
+    setOtherResponsibilityError(nextOtherError);
+
+    if (firstInvalidFieldId) {
+      requestAnimationFrame(() => {
+        document.getElementById(firstInvalidFieldId)?.focus();
+      });
+    }
+
+    return Object.keys(nextErrors).length === 0 && !nextOtherError;
+  }
+
+  function goToDashboard() {
+    navigate("/dashboard", {
+      state: { responsibilityProfilePayload }
+    });
+  }
+
   function renderStep() {
     if (isComplete) {
       return (
@@ -86,7 +297,7 @@ function Onboarding() {
           <p className="mx-auto mt-4 max-w-[560px] text-base leading-7 text-copy">
             As you continue using AnimoLog, your wellness insights will become more personalized through your check-ins, calendar, and academic activity.
           </p>
-          <Button type="button" onClick={() => navigate("/dashboard")} className="mx-auto mt-9 max-w-[500px]">
+          <Button type="button" onClick={goToDashboard} className="mx-auto mt-9 max-w-[500px]">
             Go to Dashboard
           </Button>
         </div>
@@ -160,31 +371,38 @@ function Onboarding() {
     }
 
     if (currentStep === 3) {
+      const selectedResponsibilityDetails = responsibilities.filter(({ id }) => (
+        selectedResponsibilities.includes(id)
+      ));
+
       return (
         <div>
-          <PageHeader compact title="Recurring Responsibilities" subtitle="Select all that apply." />
+          <PageHeader compact title="Recurring Responsibilities" subtitle="Select all that apply. We'll ask for your weekly hours below." />
           <div className="grid gap-3 sm:grid-cols-2">
             {responsibilities.map((responsibility) => (
               <SelectionCard
-                key={responsibility}
-                label={responsibility}
-                selected={selectedResponsibilities.includes(responsibility)}
-                onClick={() => toggleSelection(responsibility, setSelectedResponsibilities)}
+                key={responsibility.id}
+                label={responsibility.label}
+                selected={selectedResponsibilities.includes(responsibility.id)}
+                onClick={() => toggleResponsibility(responsibility.id)}
               />
             ))}
           </div>
-          {selectedResponsibilities.includes("Other") && (
-            <div className="mt-5">
-              <TextInput
-                id="other-responsibility"
-                label="Please describe"
-                name="otherResponsibility"
-                type="text"
-                value={otherResponsibility}
-                onChange={(event) => setOtherResponsibility(event.target.value)}
-                placeholder="Enter another responsibility"
-              />
-            </div>
+
+          {selectedResponsibilityDetails.length > 0 && (
+            <ResponsibilityHoursList
+              responsibilities={selectedResponsibilityDetails}
+              hours={responsibilityHours}
+              errors={responsibilityErrors}
+              otherResponsibility={otherResponsibility}
+              otherResponsibilityError={otherResponsibilityError}
+              totalHours={getResponsibilityHoursTotal(
+                selectedResponsibilities,
+                responsibilityHours
+              )}
+              onHoursChange={updateResponsibilityHours}
+              onOtherResponsibilityChange={updateOtherResponsibility}
+            />
           )}
         </div>
       );
