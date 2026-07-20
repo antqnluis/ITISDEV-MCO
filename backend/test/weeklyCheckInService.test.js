@@ -4,6 +4,7 @@ const test = require("node:test");
 const {
     createCheckIn,
     listCheckIns,
+    getCurrentCheckIn,
     getCheckIn,
     updateCheckIn,
     deleteCheckIn
@@ -73,6 +74,10 @@ test("createCheckIn validates input and assigns the authenticated student", asyn
         createCheckIn({}, "student-id", { ...validPayload, week_start: "2026-02-29" }),
         (error) => error.statusCode === 400 && error.message.includes("week_start")
     );
+    await assert.rejects(
+        createCheckIn({}, "student-id", { ...validPayload, week_start: "2026-07-07" }),
+        (error) => error.statusCode === 400 && error.message === "week_start must be a Monday"
+    );
 });
 
 test("createCheckIn reports a duplicate weekly entry", async () => {
@@ -117,6 +122,60 @@ test("listCheckIns scopes records to the authenticated student and orders newest
     assert.equal(requestedStudentId, "student-id");
     assert.deepEqual(order, { column: "week_start", options: { ascending: false } });
     assert.deepEqual(checkIns, [baseCheckIn]);
+});
+
+test("getCurrentCheckIn uses the Manila week and returns an optional owned check-in", async () => {
+    const filters = [];
+    const request = {
+        select: () => request,
+        eq(field, value) {
+            filters.push([field, value]);
+            return request;
+        },
+        maybeSingle: async () => ({ data: baseCheckIn, error: null })
+    };
+    const supabase = {
+        from(table) {
+            assert.equal(table, "weekly_check_ins");
+            return request;
+        }
+    };
+
+    const result = await getCurrentCheckIn(supabase, "student-id", {
+        now: new Date("2026-07-06T01:00:00.000Z")
+    });
+
+    assert.equal(result.weekStart, "2026-07-06");
+    assert.equal(result.checkIn, baseCheckIn);
+    assert.deepEqual(filters, [
+        ["student_id", "student-id"],
+        ["week_start", "2026-07-06"]
+    ]);
+
+    request.maybeSingle = async () => ({ data: null, error: null });
+    const missingResult = await getCurrentCheckIn(supabase, "student-id", {
+        now: new Date("2026-07-06T01:00:00.000Z")
+    });
+    assert.equal(missingResult.checkIn, null);
+});
+
+test("getCurrentCheckIn reports invalid clocks and database failures", async () => {
+    await assert.rejects(
+        getCurrentCheckIn({}, "student-id", { now: new Date("invalid") }),
+        (error) => error.statusCode === 500 && error.message.includes("current week")
+    );
+
+    const request = {
+        select: () => request,
+        eq: () => request,
+        maybeSingle: async () => ({ data: null, error: new Error("database unavailable") })
+    };
+    await assert.rejects(
+        getCurrentCheckIn({ from: () => request }, "student-id", {
+            now: new Date("2026-07-06T01:00:00.000Z")
+        }),
+        (error) => error.statusCode === 500 && error.message.includes("current weekly check-in")
+    );
 });
 
 test("getCheckIn and updateCheckIn scope records to their owner", async () => {
@@ -178,6 +237,11 @@ test("getCheckIn and updateCheckIn scope records to their owner", async () => {
 
     assert.deepEqual(updateValues, { stress_level: 2, reflection: null });
     assert.equal(checkIn.stress_level, 2);
+
+    await assert.rejects(
+        updateCheckIn({}, "student-id", "check-in-id", { week_start: "2026-07-08" }),
+        (error) => error.statusCode === 400 && error.message === "week_start must be a Monday"
+    );
 });
 
 test("deleteCheckIn returns not found and linked-record conflicts clearly", async () => {
