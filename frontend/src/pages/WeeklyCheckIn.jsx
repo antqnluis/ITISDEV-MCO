@@ -2,6 +2,7 @@ import { useState } from "react";
 import CenteredAuthLayout from "../components/layout/CenteredAuthLayout";
 import ProgressIndicator from "../components/onboarding/ProgressIndicator";
 import Button from "../components/ui/Button";
+import PageHeader from "../components/ui/PageHeader";
 import ConditionalContextQuestions from "../components/weekly-check-in/ConditionalContextQuestions";
 import MoodSelector from "../components/weekly-check-in/MoodSelector";
 import RatingQuestion from "../components/weekly-check-in/RatingQuestion";
@@ -216,10 +217,10 @@ function WeeklyCheckIn() {
     return (
       <WizardStep stepKey="reflection-and-summary">
         <div>
-          <label htmlFor="reflection" className="font-serif text-2xl font-semibold tracking-[-0.025em] text-[#10251e]">
+          <label htmlFor="reflection" className="font-display text-2xl font-semibold tracking-[-0.025em] text-ink">
             Anything on your mind this week?
           </label>
-          <p className="mt-2 text-base leading-6 text-[#6b8077]">
+          <p className="mt-2 text-sm leading-6 text-copy sm:text-base">
             Tell us anything that affected your week—academics, responsibilities, relationships, or anything else.
           </p>
           <textarea
@@ -227,9 +228,9 @@ function WeeklyCheckIn() {
             value={checkIn.reflection}
             onChange={(event) => updateCheckIn("reflection", event.target.value)}
             placeholder="This week I noticed..."
-            className="mt-6 min-h-44 w-full resize-y rounded-[15px] border border-[#d8e0dc] bg-white p-5 text-base leading-6 text-[#10251e] shadow-[0_2px_4px_rgba(32,48,57,0.07)] outline-none transition placeholder:text-[#9aacb0] focus:border-[#4b8360] focus:ring-2 focus:ring-[#4b8360]/20"
+            className="form-control mt-5 min-h-44 resize-y p-4 leading-6"
           />
-          <p className="mt-3 text-sm text-[#789087]">Reflection is optional.</p>
+          <p className="mt-3 text-sm text-soft">Reflection is optional.</p>
           <div className="mt-8">
             <WeeklySummaryCard checkIn={checkIn} moodLabel={moodLabel} studyHoursLabel={studyHoursLabel} />
           </div>
@@ -241,10 +242,10 @@ function WeeklyCheckIn() {
   if (isSubmitted) {
     return (
       <CenteredAuthLayout>
-        <section className="w-full max-w-[500px] rounded-[20px] border border-[#d8e0dc] bg-white p-8 text-center shadow-[0_8px_24px_rgba(32,48,57,0.1)] sm:p-10">
-          <div className="mx-auto grid size-14 place-items-center rounded-full bg-[#4b8360] text-2xl text-white" aria-hidden="true">✓</div>
-          <h1 className="mt-6 font-serif text-[42px] font-semibold leading-none tracking-[-0.045em] text-[#10251e]">Check-in saved locally.</h1>
-          <p className="mt-5 text-base leading-7 text-[#59706a]">
+        <section className="surface-panel w-full max-w-[540px] p-8 text-center sm:p-11">
+          <div className="mx-auto grid size-14 place-items-center rounded-full bg-brand text-2xl text-white shadow-[0_8px_22px_rgb(52_115_77_/_0.24)]" aria-hidden="true">✓</div>
+          <h1 className="mt-6 font-display text-[2.35rem] font-semibold leading-[1.05] tracking-[-0.035em] text-ink sm:text-[2.65rem]">Check-in saved locally.</h1>
+          <p className="mt-5 text-base leading-7 text-copy">
             Your reflection has been recorded for this session. Small moments of awareness matter.
           </p>
         </section>
@@ -254,16 +255,17 @@ function WeeklyCheckIn() {
 
   return (
     <CenteredAuthLayout>
-      <div className="w-full max-w-[720px] py-4">
-        <header className="mb-9">
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#4b8360]">Weekly Check-In</p>
-          <h1 className="mt-3 font-serif text-[42px] font-semibold leading-none tracking-[-0.045em] text-[#10251e] sm:text-[44px]">Weekly Check-In</h1>
-          <p className="mt-4 text-xl leading-6 text-[#59706a]">Takes about 2 minutes.</p>
-        </header>
+      <div className="w-full max-w-[760px] py-2">
+        <PageHeader
+          compact
+          eyebrow="Weekly reflection"
+          title="Weekly Check-In"
+          subtitle="Takes about 2 minutes."
+        />
 
         <ProgressIndicator currentStep={currentStep} totalSteps={totalSteps} />
 
-        <section className="rounded-[20px] border border-[#d8e0dc] bg-white p-6 shadow-[0_4px_14px_rgba(32,48,57,0.07)] sm:p-8">
+        <section className="surface-panel p-5 sm:p-8">
           {renderStep()}
         </section>
 

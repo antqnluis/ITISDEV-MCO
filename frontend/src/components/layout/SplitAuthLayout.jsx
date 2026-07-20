@@ -1,56 +1,56 @@
 import Logo from "../ui/Logo";
 
-function WellnessIllustration() {
+function AcademicBackdrop() {
   return (
-    <svg
-      aria-hidden="true"
-      className="absolute left-1/2 top-[52%] w-[330px] -translate-x-1/2 -translate-y-1/2 opacity-70"
-      viewBox="0 0 330 360"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <circle cx="78" cy="216" r="88" fill="#B9D9B6" fillOpacity="0.24" />
-      <ellipse cx="222" cy="151" rx="76" ry="98" fill="#A5CBA6" fillOpacity="0.34" />
-      <ellipse cx="111" cy="260" rx="42" ry="67" fill="#94C492" fillOpacity="0.42" transform="rotate(22 111 260)" />
-      <circle cx="106" cy="63" r="8" fill="#C7E4C4" />
-      <circle cx="65" cy="146" r="7" fill="#75AF78" />
-      <circle cx="289" cy="238" r="10" fill="#C7E8C3" />
-      <circle cx="25" cy="336" r="6" fill="#91C592" />
-      <circle cx="228" cy="344" r="7" fill="#C7E8C3" />
-      <path d="M108 354C108 248 143 198 151 175C159 151 153 113 89 127" stroke="#73AA79" strokeOpacity="0.68" strokeWidth="1.8" />
-      <path d="M191 354C163 270 146 210 143 174C140 137 124 111 89 127" stroke="#73AA79" strokeOpacity="0.68" strokeWidth="1.8" />
-      <path d="M141 173C118 161 110 136 114 113C118 91 139 79 156 85C176 91 181 116 172 139C166 155 155 167 141 173Z" fill="#79B57B" fillOpacity="0.65" />
-      <path d="M143 172C145 137 143 111 137 92" stroke="#6EA675" strokeOpacity="0.55" strokeWidth="1.5" />
-      <path d="M149 179C173 161 188 145 208 128" stroke="#73AA79" strokeOpacity="0.68" strokeWidth="1.8" />
-      <path d="M159 153C168 124 194 110 218 118C243 127 249 151 234 170C218 190 183 194 159 177C154 173 154 161 159 153Z" fill="#7BB679" fillOpacity="0.65" />
-      <path d="M154 178C183 163 207 144 225 127" stroke="#6EA675" strokeOpacity="0.55" strokeWidth="1.5" />
-      <path d="M133 210C106 204 88 186 85 161C82 136 98 120 119 122C143 124 155 151 149 175C146 190 141 201 133 210Z" fill="#76AE76" fillOpacity="0.68" />
-      <path d="M134 210C118 183 105 157 96 136" stroke="#6EA675" strokeOpacity="0.55" strokeWidth="1.5" />
-      <ellipse cx="141" cy="182" rx="13" ry="12" fill="#6AAA70" fillOpacity="0.62" />
-      <ellipse cx="165" cy="194" rx="14" ry="18" fill="#7CB67B" fillOpacity="0.59" transform="rotate(35 165 194)" />
-      <path d="M124 254C104 247 91 233 92 214C93 194 109 179 126 185C144 192 147 217 140 235C136 245 131 251 124 254Z" fill="#70AB73" fillOpacity="0.62" />
-      <path d="M124 253C126 229 125 206 119 188" stroke="#6EA675" strokeOpacity="0.45" strokeWidth="1.3" />
-      <ellipse cx="223" cy="89" rx="7" ry="13" fill="#71AC76" fillOpacity="0.7" transform="rotate(43 223 89)" />
-      <ellipse cx="210" cy="100" rx="6" ry="12" fill="#75B178" fillOpacity="0.7" transform="rotate(64 210 100)" />
-      <ellipse cx="40" cy="276" rx="7" ry="13" fill="#77B477" fillOpacity="0.66" transform="rotate(-58 40 276)" />
-      <ellipse cx="54" cy="282" rx="6" ry="12" fill="#77B477" fillOpacity="0.66" transform="rotate(-62 54 282)" />
-      <circle cx="253" cy="128" r="4" fill="#78AD78" fillOpacity="0.62" />
-    </svg>
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      <div className="auth-academic-grid absolute inset-0 opacity-45" />
+
+      <div className="absolute -right-24 top-[12%] h-[64%] w-[78%] rounded-t-[999px] border border-[#edf1d8]/13" />
+      <div className="absolute -right-10 top-[20%] h-[56%] w-[61%] rounded-t-[999px] border border-[#edf1d8]/18" />
+      <div className="absolute right-[8%] top-[29%] h-[47%] w-[42%] rounded-t-[999px] border border-[#edf1d8]/14 bg-white/[0.025]" />
+
+      <div className="absolute left-[10%] top-[23%] size-2 rounded-full bg-[#e5ddb9]/55" />
+      <div className="absolute left-[10%] top-[23%] h-px w-28 bg-gradient-to-r from-[#e5ddb9]/45 to-transparent" />
+      <div className="absolute -left-32 bottom-[8%] size-80 rounded-full border border-white/[0.06]" />
+      <div className="absolute -left-20 bottom-[13%] size-56 rounded-full border border-white/[0.06]" />
+    </div>
   );
 }
 
 function SplitAuthLayout({ children }) {
   return (
-    <main className="min-h-screen bg-[#fdfcf9] lg:grid lg:grid-cols-[minmax(420px,42%)_1fr]">
-      <aside className="relative hidden min-h-screen overflow-hidden bg-[#e6f2e4] lg:block">
-        <div className="absolute left-8 top-9">
-          <Logo />
+    <main className="min-h-screen bg-canvas lg:grid lg:grid-cols-[minmax(400px,44%)_1fr]">
+      <aside className="auth-ambient-panel relative hidden min-h-screen overflow-hidden p-9 text-white lg:grid lg:grid-rows-[auto_minmax(5rem,1fr)_auto] lg:gap-8 xl:p-10">
+        <AcademicBackdrop />
+
+        <div className="relative z-[1]">
+          <Logo inverse />
         </div>
-        <WellnessIllustration />
+
+        <div aria-hidden="true" />
+
+        <div className="relative z-[1] max-w-[455px] pb-2">
+          <p className="mb-4 flex items-center gap-3 text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[#e9e5cb]/65">
+            <span className="h-px w-8 bg-[#e9e5cb]/35" />
+            A steadier week starts here
+          </p>
+          <h2 className="max-w-[430px] font-display text-[2.3rem] font-semibold leading-[1.06] tracking-[-0.035em] text-[#fffdf4] xl:text-[2.8rem]">
+            Pause. Reflect. Find your balance.
+          </h2>
+          <p className="mt-5 max-w-[390px] text-sm leading-6 text-white/68 xl:text-base">
+            A private space to make sense of your workload, wellbeing, and week.
+          </p>
+        </div>
       </aside>
 
-      <section className="flex min-h-screen items-center justify-center px-6 py-12 sm:px-10 lg:px-16">
-        {children}
+      <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-7 sm:px-10 sm:py-12 lg:px-14 xl:px-20">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-36 size-96 rounded-full bg-brand-soft/55 blur-3xl lg:hidden" />
+        <div className="relative w-full max-w-[500px]">
+          <div className="mb-10 lg:hidden">
+            <Logo />
+          </div>
+          {children}
+        </div>
       </section>
     </main>
   );

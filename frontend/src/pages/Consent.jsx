@@ -48,53 +48,60 @@ function Consent() {
 
   return (
     <CenteredAuthLayout>
-      <div className="w-full max-w-[720px]">
+      <section className="surface-panel w-full max-w-[800px] p-5 sm:p-8 lg:p-10">
         <PageHeader
+          compact
+          eyebrow="Your privacy matters"
           title="Privacy & Consent"
           subtitle="Before we get started, we'd like to explain how AnimoLog uses your information."
-          className="text-center"
+          align="center"
         />
 
-        <p className="mb-6 text-base leading-7 text-[#59706a]">
+        <p className="mx-auto mb-7 max-w-[680px] text-sm leading-6 text-copy sm:text-base sm:leading-7">
           Your wellbeing information belongs to you. AnimoLog collects only the information needed to generate personalized wellness insights and recommendations. Your information is kept private and is never automatically shared with faculty, counselors, or administrators.
         </p>
 
-        <div className="space-y-4">
-          {informationCards.map((card) => (
-            <InformationCard key={card.title} title={card.title} items={card.items} />
+        <div className="grid gap-4 md:grid-cols-2">
+          {informationCards.map((card, index) => (
+            <InformationCard
+              key={card.title}
+              title={card.title}
+              items={card.items}
+              className={index === informationCards.length - 1 ? "md:col-span-2" : ""}
+            />
           ))}
-          <InformationCard title="Important">
+          <InformationCard title="Important" className="border-brand/20 bg-brand-wash md:col-span-2">
             <p>AnimoLog is a student wellness support tool.</p>
             <p>It does not diagnose mental health conditions and does not replace professional counseling, medical care, or university support services.</p>
           </InformationCard>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 border-t border-[#dce5dd] pt-8" noValidate>
+        <form onSubmit={handleSubmit} className="mt-8 border-t border-line pt-7" noValidate>
           <fieldset className="space-y-5">
             <legend className="sr-only">Privacy consent</legend>
 
-            <label className="flex cursor-pointer items-start gap-3 text-base leading-6 text-[#58716a]">
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl text-sm leading-6 text-copy focus-within:ring-2 focus-within:ring-brand/20 sm:text-base">
               <input
                 type="checkbox"
                 checked={hasReadConsent}
                 onChange={(event) => setHasReadConsent(event.target.checked)}
-                className="mt-1 size-4 shrink-0 accent-[#4b8360]"
+                className="mt-1 size-5 shrink-0 accent-brand"
               />
               <span>I have read and understood how AnimoLog collects and uses my information.</span>
             </label>
 
-            <label className="flex cursor-pointer items-start gap-3 text-base leading-6 text-[#58716a]">
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl text-sm leading-6 text-copy focus-within:ring-2 focus-within:ring-brand/20 sm:text-base">
               <input
                 type="checkbox"
                 checked={hasGivenConsent}
                 onChange={(event) => setHasGivenConsent(event.target.checked)}
-                className="mt-1 size-4 shrink-0 accent-[#4b8360]"
+                className="mt-1 size-5 shrink-0 accent-brand"
               />
               <span>I voluntarily consent to the collection and processing of my information to provide personalized wellness insights and recommendations.</span>
             </label>
           </fieldset>
 
-          <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row">
+          <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" onClick={() => navigate("/register")} className="sm:flex-1">
               Back
             </Button>
@@ -103,7 +110,7 @@ function Consent() {
             </Button>
           </div>
         </form>
-      </div>
+      </section>
     </CenteredAuthLayout>
   );
 }

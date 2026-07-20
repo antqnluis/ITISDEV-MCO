@@ -3,12 +3,12 @@ const ratings = [1, 2, 3, 4, 5];
 function RatingQuestion({ id, question, helper, value, onChange, lowLabel, highLabel, error }) {
   return (
     <fieldset aria-describedby={helper ? `${id}-helper` : undefined}>
-      <legend className="font-serif text-2xl font-semibold tracking-[-0.025em] text-[#10251e]">
+      <legend className="font-display text-2xl font-semibold leading-tight tracking-[-0.025em] text-ink">
         {question}
       </legend>
-      {helper && <p id={`${id}-helper`} className="mt-2 text-base leading-6 text-[#6b8077]">{helper}</p>}
+      {helper && <p id={`${id}-helper`} className="mt-2 text-sm leading-6 text-copy sm:text-base">{helper}</p>}
 
-      <div className="mt-6 grid grid-cols-5 gap-2" aria-invalid={Boolean(error)}>
+      <div className="mt-5 grid grid-cols-5 gap-2 sm:gap-2.5" aria-invalid={Boolean(error)}>
         {ratings.map((rating) => (
           <label key={rating} className="cursor-pointer">
             <input
@@ -19,18 +19,18 @@ function RatingQuestion({ id, question, helper, value, onChange, lowLabel, highL
               onChange={() => onChange(rating)}
               className="peer sr-only"
             />
-            <span className="flex h-12 items-center justify-center rounded-xl border border-[#d8e0dc] bg-white text-base font-semibold text-[#59706a] transition peer-checked:border-[#4b8360] peer-checked:bg-[#edf6eb] peer-checked:text-[#174635] peer-focus-visible:ring-2 peer-focus-visible:ring-[#4b8360] peer-focus-visible:ring-offset-2">
+            <span className="flex min-h-12 items-center justify-center rounded-xl border border-line bg-surface text-base font-bold text-copy shadow-field transition duration-200 hover:border-line-strong peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white peer-checked:shadow-none peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2">
               {rating}
             </span>
           </label>
         ))}
       </div>
 
-      <div className="mt-3 flex justify-between text-sm text-[#789087]">
+      <div className="mt-3 flex justify-between gap-4 text-xs font-medium text-soft sm:text-sm">
         <span>{lowLabel}</span>
         <span>{highLabel}</span>
       </div>
-      {error && <p className="mt-3 text-sm font-medium text-[#a34343]">{error}</p>}
+      {error && <p className="mt-3 text-sm font-medium text-danger">{error}</p>}
     </fieldset>
   );
 }

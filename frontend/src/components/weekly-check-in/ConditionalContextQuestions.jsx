@@ -6,7 +6,7 @@ function ConditionalContextQuestions({ questions = [], values, onChange, errors 
   }
 
   return (
-    <div className="space-y-8 border-t border-[#dce5dd] pt-8">
+    <div className="space-y-8 border-t border-line pt-8">
       {questions.map((question) => (
         <RatingQuestion
           key={question.id}

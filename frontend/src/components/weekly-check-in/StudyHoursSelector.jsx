@@ -3,13 +3,13 @@ import { studyHoursOptions } from "./options";
 function StudyHoursSelector({ value, onChange, error }) {
   return (
     <fieldset aria-describedby="study-hours-helper">
-      <legend className="font-serif text-2xl font-semibold tracking-[-0.025em] text-[#10251e]">
+      <legend className="font-display text-2xl font-semibold leading-tight tracking-[-0.025em] text-ink">
         Available Study Hours This Week
       </legend>
-      <p id="study-hours-helper" className="mt-2 text-base leading-6 text-[#6b8077]">
+      <p id="study-hours-helper" className="mt-2 text-sm leading-6 text-copy sm:text-base">
         Think about your schedule after classes, work, commuting, and other responsibilities.
       </p>
-      <p className="mt-4 text-base font-medium text-[#174635]">
+      <p className="mt-4 text-sm font-semibold text-ink sm:text-base">
         How many hours do you realistically have available to study this week?
       </p>
 
@@ -24,13 +24,13 @@ function StudyHoursSelector({ value, onChange, error }) {
               onChange={() => onChange(option.value)}
               className="peer sr-only"
             />
-            <span className="flex min-h-14 items-center justify-center rounded-xl border border-[#d8e0dc] bg-white px-3 text-center text-sm font-medium text-[#59706a] transition peer-checked:border-[#4b8360] peer-checked:bg-[#edf6eb] peer-checked:text-[#174635] peer-focus-visible:ring-2 peer-focus-visible:ring-[#4b8360] peer-focus-visible:ring-offset-2">
+            <span className="flex min-h-14 items-center justify-center rounded-xl border border-line bg-surface px-3 text-center text-sm font-semibold text-copy shadow-field transition duration-200 hover:border-line-strong peer-checked:border-brand peer-checked:bg-brand-soft peer-checked:text-brand-deep peer-checked:shadow-none peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2">
               {option.label}
             </span>
           </label>
         ))}
       </div>
-      {error && <p className="mt-3 text-sm font-medium text-[#a34343]">{error}</p>}
+      {error && <p className="mt-3 text-sm font-medium text-danger">{error}</p>}
     </fieldset>
   );
 }
