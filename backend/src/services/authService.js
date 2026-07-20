@@ -4,6 +4,18 @@ const {
     signOutSession
 } = require("../config/supabaseClient");
 
+const STUDENT_SELECT = [
+    "id",
+    "student_number",
+    "first_name",
+    "last_name",
+    "consent_given",
+    "consented_at",
+    "privacy_notice_version",
+    "created_at",
+    "updated_at"
+].join(", ");
+
 function createServiceError(message, statusCode = 400) {
     const error = new Error(message);
     error.statusCode = statusCode;
@@ -16,6 +28,16 @@ function getRequiredString(value, fieldName) {
     }
 
     return value.trim();
+}
+
+function getStudentName(value, fieldName) {
+    const normalized = getRequiredString(value, fieldName);
+
+    if (normalized.length > 100) {
+        throw createServiceError(`${fieldName} must be at most 100 characters`, 400);
+    }
+
+    return normalized;
 }
 
 function getAuthErrorStatus(error, fallbackStatus = 400) {
@@ -50,10 +72,12 @@ function toUser(user) {
     };
 }
 
-async function registerStudent({ email, password, student_number } = {}) {
+async function registerStudent({ email, password, student_number, first_name, last_name } = {}) {
     const normalizedEmail = getRequiredString(email, "email").toLowerCase();
     const normalizedPassword = getRequiredString(password, "password");
     const normalizedStudentNumber = getRequiredString(student_number, "student_number");
+    const normalizedFirstName = getStudentName(first_name, "first_name");
+    const normalizedLastName = getStudentName(last_name, "last_name");
 
     if (normalizedStudentNumber.length < 4 || normalizedStudentNumber.length > 30) {
         throw createServiceError("student_number must be between 4 and 30 characters", 400);
@@ -82,9 +106,11 @@ async function registerStudent({ email, password, student_number } = {}) {
         .from("students")
         .insert({
             id: authData.user.id,
-            student_number: normalizedStudentNumber
+            student_number: normalizedStudentNumber,
+            first_name: normalizedFirstName,
+            last_name: normalizedLastName
         })
-        .select("id, student_number, consent_given, consented_at, privacy_notice_version, created_at, updated_at")
+        .select(STUDENT_SELECT)
         .single();
 
     if (studentError) {
@@ -127,7 +153,7 @@ async function loginStudent({ email, password } = {}) {
 async function getCurrentStudent(supabase, userId) {
     const { data, error } = await supabase
         .from("students")
-        .select("id, student_number, consent_given, consented_at, privacy_notice_version, created_at, updated_at")
+        .select(STUDENT_SELECT)
         .eq("id", userId)
         .maybeSingle();
 

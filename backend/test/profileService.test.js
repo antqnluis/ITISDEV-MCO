@@ -16,6 +16,8 @@ const baseProfile = {
     college: "College of Computing",
     program: "BSIT",
     year_level: 3,
+    current_academic_term: 1,
+    wellness_goals: ["Managing Stress"],
     commute_minutes_per_day: 30,
     available_study_hours_per_week: 10,
     has_caregiving_responsibility: false,
@@ -58,6 +60,8 @@ test("createProfile uses the authenticated student ID and sets onboarding comple
         college: " College of Computing ",
         program: " BSIT ",
         year_level: 3,
+        current_academic_term: 1,
+        wellness_goals: [" Managing Stress ", "Better Sleep"],
         is_employed: true,
         work_hours_per_week: 12
     });
@@ -65,6 +69,8 @@ test("createProfile uses the authenticated student ID and sets onboarding comple
     assert.equal(insertedProfile.student_id, "student-id");
     assert.equal(insertedProfile.college, "College of Computing");
     assert.equal(insertedProfile.program, "BSIT");
+    assert.equal(insertedProfile.current_academic_term, 1);
+    assert.deepEqual(insertedProfile.wellness_goals, ["Managing Stress", "Better Sleep"]);
     assert.equal(insertedProfile.work_hours_per_week, 12);
     assert.ok(Number.isFinite(Date.parse(insertedProfile.onboarding_completed_at)));
     assert.equal(profile.student_id, "student-id");
@@ -75,7 +81,8 @@ test("createProfile rejects invalid and duplicate profiles", async () => {
         createProfile({}, "student-id", {
             college: "College of Computing",
             program: "BSIT",
-            year_level: 7
+            year_level: 7,
+            current_academic_term: 1
         }),
         (error) => error.statusCode === 400 && error.message.includes("year_level")
     );
@@ -94,9 +101,77 @@ test("createProfile rejects invalid and duplicate profiles", async () => {
         createProfile(duplicateSupabase, "student-id", {
             college: "College of Computing",
             program: "BSIT",
-            year_level: 3
+            year_level: 3,
+            current_academic_term: 1
         }),
         (error) => error.statusCode === 409
+    );
+});
+
+test("createProfile requires a valid academic term and defaults wellness goals", async () => {
+    await assert.rejects(
+        createProfile({}, "student-id", {
+            college: "College of Computing",
+            program: "BSIT",
+            year_level: 3
+        }),
+        (error) => error.statusCode === 400 && error.message.includes("current_academic_term")
+    );
+    await assert.rejects(
+        createProfile({}, "student-id", {
+            college: "College of Computing",
+            program: "BSIT",
+            year_level: 3,
+            current_academic_term: 4
+        }),
+        (error) => error.statusCode === 400 && error.message.includes("between 1 and 3")
+    );
+
+    let insertedProfile;
+    const supabase = {
+        from: () => ({
+            insert: (profile) => {
+                insertedProfile = profile;
+                return {
+                    select: () => ({
+                        single: async () => ({ data: profile, error: null })
+                    })
+                };
+            }
+        })
+    };
+    await createProfile(supabase, "student-id", {
+        college: "College of Computing",
+        program: "BSIT",
+        year_level: 3,
+        current_academic_term: 1
+    });
+
+    assert.deepEqual(insertedProfile.wellness_goals, []);
+});
+
+test("profile writes reject malformed wellness goals", async () => {
+    const requiredProfile = {
+        college: "College of Computing",
+        program: "BSIT",
+        year_level: 3,
+        current_academic_term: 1
+    };
+
+    await assert.rejects(
+        createProfile({}, "student-id", { ...requiredProfile, wellness_goals: "Managing Stress" }),
+        (error) => error.statusCode === 400 && error.message.includes("array")
+    );
+    await assert.rejects(
+        createProfile({}, "student-id", { ...requiredProfile, wellness_goals: [" "] }),
+        (error) => error.statusCode === 400 && error.message.includes("non-empty strings")
+    );
+    await assert.rejects(
+        createProfile({}, "student-id", {
+            ...requiredProfile,
+            wellness_goals: Array.from({ length: 11 }, (_, index) => `Goal ${index}`)
+        }),
+        (error) => error.statusCode === 400 && error.message.includes("at most 10")
     );
 });
 
@@ -168,12 +243,16 @@ test("updateProfile validates fields and updates only the caller's profile", asy
     const profile = await updateProfile(supabase, "student-id", {
         is_employed: true,
         work_hours_per_week: 16,
+        current_academic_term: 2,
+        wellness_goals: [" Managing Workload "],
         additional_context: "Taking a part-time job this term"
     });
 
     assert.deepEqual(updateValues, {
         is_employed: true,
         work_hours_per_week: 16,
+        current_academic_term: 2,
+        wellness_goals: ["Managing Workload"],
         additional_context: "Taking a part-time job this term"
     });
     assert.equal(updatedStudentId, "student-id");

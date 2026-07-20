@@ -1,3 +1,8 @@
+const {
+    normalizeMondayDate,
+    getManilaWeekStart
+} = require("../utils/weekDate");
+
 const CHECK_IN_FIELDS = new Set([
     "week_start",
     "stress_level",
@@ -52,25 +57,6 @@ function hasOwn(object, property) {
     return Object.prototype.hasOwnProperty.call(object, property);
 }
 
-function normalizeDate(value) {
-    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        throw createServiceError("week_start must be a valid date in YYYY-MM-DD format");
-    }
-
-    const [year, month, day] = value.split("-").map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day));
-
-    if (
-        date.getUTCFullYear() !== year
-        || date.getUTCMonth() !== month - 1
-        || date.getUTCDate() !== day
-    ) {
-        throw createServiceError("week_start must be a valid date in YYYY-MM-DD format");
-    }
-
-    return value;
-}
-
 function normalizeCheckInInput(payload, { isCreate = false } = {}) {
     if (!isPlainObject(payload)) {
         throw createServiceError("Request body must be a JSON object");
@@ -100,7 +86,7 @@ function normalizeCheckInInput(payload, { isCreate = false } = {}) {
 
     for (const [field, value] of Object.entries(payload)) {
         if (field === "week_start") {
-            normalized[field] = normalizeDate(value);
+            normalized[field] = normalizeMondayDate(value);
             continue;
         }
 
@@ -182,6 +168,31 @@ async function listCheckIns(supabase, studentId) {
     return data || [];
 }
 
+async function getCurrentCheckIn(supabase, studentId, { now = new Date() } = {}) {
+    let weekStart;
+    try {
+        weekStart = getManilaWeekStart(now);
+    } catch (error) {
+        throw createServiceError("Unable to determine the current week", 500);
+    }
+
+    const { data, error } = await supabase
+        .from("weekly_check_ins")
+        .select(CHECK_IN_SELECT)
+        .eq("student_id", studentId)
+        .eq("week_start", weekStart)
+        .maybeSingle();
+
+    if (error) {
+        throw createServiceError("Unable to retrieve the current weekly check-in", 500);
+    }
+
+    return {
+        weekStart,
+        checkIn: data || null
+    };
+}
+
 async function getCheckIn(supabase, studentId, checkInId) {
     const { data, error } = await supabase
         .from("weekly_check_ins")
@@ -243,6 +254,7 @@ async function deleteCheckIn(supabase, studentId, checkInId) {
 module.exports = {
     createCheckIn,
     listCheckIns,
+    getCurrentCheckIn,
     getCheckIn,
     updateCheckIn,
     deleteCheckIn

@@ -1,5 +1,5 @@
 const express = require("express");
-const profileController = require("../controllers/profileController");
+const wellnessDimensionScoreController = require("../controllers/wellnessDimensionScoreController");
 const { requireAuth } = require("../middleware/authMiddleware");
 const { requireConsent } = require("../middleware/consentMiddleware");
 
@@ -7,9 +7,7 @@ const router = express.Router();
 
 router.use(requireAuth);
 router.use(requireConsent);
-router.post("/", profileController.create);
-router.get("/", profileController.get);
-router.patch("/", profileController.update);
-router.delete("/", profileController.remove);
+router.get("/", wellnessDimensionScoreController.list);
+router.get("/:id", wellnessDimensionScoreController.get);
 
 module.exports = router;
