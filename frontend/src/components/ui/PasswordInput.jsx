@@ -15,7 +15,7 @@ function PasswordInput({ id, label, action, ...props }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-4">
-        <label htmlFor={id} className="text-base font-medium text-[#174635]">
+        <label htmlFor={id} className="text-sm font-semibold text-ink">
           {label}
         </label>
         {action}
@@ -24,14 +24,14 @@ function PasswordInput({ id, label, action, ...props }) {
         <input
           id={id}
           type={isPasswordVisible ? "text" : "password"}
-          className="h-[61px] w-full rounded-[15px] border border-[#d8e0dc] bg-white px-5 pr-14 text-lg text-[#10251e] shadow-[0_2px_4px_rgba(32,48,57,0.07)] outline-none transition focus:border-[#4b8360] focus:ring-2 focus:ring-[#4b8360]/20"
+          className="form-control pr-14"
           {...props}
         />
         <button
           type="button"
           onClick={() => setIsPasswordVisible((isVisible) => !isVisible)}
           aria-label={isPasswordVisible ? "Hide password" : "Show password"}
-          className="absolute inset-y-0 right-0 grid w-14 place-items-center text-[#718478] focus-visible:rounded-r-[15px] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#4b8360]"
+          className="absolute inset-y-0 right-0 grid w-14 place-items-center rounded-r-[0.875rem] text-soft transition hover:text-brand-deep focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-brand"
         >
           <EyeIcon />
         </button>

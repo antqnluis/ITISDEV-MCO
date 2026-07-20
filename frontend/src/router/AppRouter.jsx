@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 
 import Login from "../pages/Login";
 import Register from "../pages/Register";
@@ -21,6 +21,7 @@ function AppRouter() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/check-in" element={<WeeklyCheckIn />} />
+                <Route path="/weekly-check-in" element={<Navigate to="/check-in" replace />} />
                 <Route path="/academic-records" element={<AcademicRecords />} />
                 <Route path="/settings" element={<Settings />} />
             </Routes>

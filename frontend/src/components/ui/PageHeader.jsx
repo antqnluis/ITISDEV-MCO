@@ -1,14 +1,24 @@
 function PageHeader({
+  align = "left",
+  compact = false,
+  eyebrow,
   title,
   subtitle,
   className = ""
 }) {
+  const alignmentClassName = align === "center" ? "text-center" : "text-left";
+
   return (
-    <header className={`mb-12 ${className}`}>
-      <h1 className="font-serif text-[42px] font-semibold leading-none tracking-[-0.045em] text-[#10251e] sm:text-[44px]">
+    <header className={`${compact ? "mb-7" : "mb-9 sm:mb-10"} ${alignmentClassName} ${className}`}>
+      {eyebrow && (
+        <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-brand">
+          {eyebrow}
+        </p>
+      )}
+      <h1 className="font-display text-[2.35rem] font-semibold leading-[1.02] tracking-[-0.035em] text-ink sm:text-[2.75rem]">
         {title}
       </h1>
-      {subtitle && <p className="mt-4 text-xl leading-6 text-[#59706a]">{subtitle}</p>}
+      {subtitle && <p className="mt-4 text-lg leading-7 text-copy sm:text-xl">{subtitle}</p>}
     </header>
   );
 }

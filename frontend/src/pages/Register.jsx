@@ -1,13 +1,10 @@
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import CenteredAuthLayout from "../components/layout/CenteredAuthLayout";
+import SplitAuthLayout from "../components/layout/SplitAuthLayout";
 import Button from "../components/ui/Button";
-import Logo from "../components/ui/Logo";
 import PageHeader from "../components/ui/PageHeader";
 import PasswordInput from "../components/ui/PasswordInput";
 import TextInput from "../components/ui/TextInput";
-
-const textInputClassName = "h-[61px] w-full rounded-[15px] border border-[#d8e0dc] bg-white px-5 text-lg text-[#10251e] shadow-[0_2px_4px_rgba(32,48,57,0.13)] outline-none transition focus:border-[#4b8360] focus:ring-2 focus:ring-[#4b8360]/20";
 
 function Register() {
   const navigate = useNavigate();
@@ -18,36 +15,35 @@ function Register() {
   }
 
   return (
-    <CenteredAuthLayout>
-      <div className="w-full max-w-[500px]">
-        <div className="mb-10">
-          <Logo />
-        </div>
+    <SplitAuthLayout>
+      <div className="w-full py-2">
         <PageHeader
+          compact
+          eyebrow="Join AnimoLog"
           title="Create your account"
           subtitle="Start your wellness journey with AnimoLog."
         />
 
-        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-          <TextInput
-            id="first-name"
-            label="First Name"
-            name="firstName"
-            type="text"
-            placeholder="Enter your first name"
-            autoComplete="given-name"
-            inputClassName={textInputClassName}
-          />
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextInput
+              id="first-name"
+              label="First Name"
+              name="firstName"
+              type="text"
+              placeholder="First name"
+              autoComplete="given-name"
+            />
 
-          <TextInput
-            id="last-name"
-            label="Last Name"
-            name="lastName"
-            type="text"
-            placeholder="Enter your last name"
-            autoComplete="family-name"
-            inputClassName={textInputClassName}
-          />
+            <TextInput
+              id="last-name"
+              label="Last Name"
+              name="lastName"
+              type="text"
+              placeholder="Last name"
+              autoComplete="family-name"
+            />
+          </div>
 
           <TextInput
             id="email"
@@ -56,7 +52,6 @@ function Register() {
             type="email"
             placeholder="Enter your DLSU email"
             autoComplete="email"
-            inputClassName={textInputClassName}
           />
 
           <PasswordInput
@@ -75,20 +70,20 @@ function Register() {
             autoComplete="new-password"
           />
 
-          <Button type="submit" className="mt-3">Create Account</Button>
+          <Button type="submit" className="mt-2">Create Account</Button>
         </form>
 
-        <p className="mt-9 text-center text-base text-[#58716a]">
+        <p className="mt-8 text-center text-sm text-copy sm:text-base">
           Already have an account?{" "}
           <Link
             to="/"
-            className="font-medium text-[#326d46] underline underline-offset-2 focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4b8360]"
+            className="rounded font-semibold text-brand-deep underline decoration-brand/35 underline-offset-4 transition hover:decoration-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             Sign in
           </Link>
         </p>
       </div>
-    </CenteredAuthLayout>
+    </SplitAuthLayout>
   );
 }
 export default Register;

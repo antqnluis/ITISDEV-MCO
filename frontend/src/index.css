@@ -1,18 +1,50 @@
 @import "tailwindcss";
 
+@theme {
+  --color-canvas: #f5f7f2;
+  --color-surface: #fffefb;
+  --color-ink: #18372d;
+  --color-copy: #587067;
+  --color-soft: #82958d;
+  --color-line: #d9e4dc;
+  --color-line-strong: #b7cabc;
+  --color-brand: #34734d;
+  --color-brand-hover: #2a6240;
+  --color-brand-deep: #1d5037;
+  --color-brand-soft: #e8f2e6;
+  --color-brand-wash: #f0f6ed;
+  --color-danger: #a33f3f;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --shadow-field: 0 1px 2px rgb(24 55 45 / 0.05), 0 6px 18px rgb(24 55 45 / 0.04);
+  --shadow-card: 0 10px 35px rgb(24 55 45 / 0.07);
+  --shadow-lifted: 0 20px 55px rgb(24 55 45 / 0.14);
+}
+
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #10251e;
-  background: #f7f7f3;
+  color: #18372d;
+  background: #f5f7f2;
+  font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: #f5f7f2;
 }
 
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  background: #f5f7f2;
+  color: #18372d;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -20,6 +52,20 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+button,
+a,
+label,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: #cfe2cc;
+  color: #18372d;
 }
 
 button,
@@ -32,7 +78,93 @@ select:disabled {
   cursor: not-allowed;
 }
 
-::selection {
-  color: #173e30;
-  background: #cfe5d3;
+.form-control {
+  min-height: 3.5rem;
+  width: 100%;
+  border: 1px solid #d9e4dc;
+  border-radius: 0.875rem;
+  background: #fffefb;
+  padding: 0.875rem 1rem;
+  color: #18372d;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  box-shadow: var(--shadow-field);
+  outline: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.form-control::placeholder {
+  color: #8da098;
+}
+
+.form-control:hover:not(:disabled) {
+  border-color: #b7cabc;
+}
+
+.form-control:focus {
+  border-color: #34734d;
+  box-shadow: 0 0 0 3px rgb(52 115 77 / 0.14), var(--shadow-field);
+}
+
+.form-control:disabled {
+  cursor: not-allowed;
+  background: #eff2ed;
+  color: #82958d;
+}
+
+.surface-card {
+  border: 1px solid #d9e4dc;
+  border-radius: 1rem;
+  background: rgb(255 254 251 / 0.96);
+  box-shadow: var(--shadow-field);
+}
+
+.surface-panel {
+  border: 1px solid rgb(217 228 220 / 0.9);
+  border-radius: 1.5rem;
+  background: rgb(255 254 251 / 0.94);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(12px);
+}
+
+.auth-ambient-panel {
+  background:
+    radial-gradient(circle at 14% 12%, rgb(83 148 103 / 0.62), transparent 28%),
+    radial-gradient(circle at 82% 72%, rgb(52 115 77 / 0.52), transparent 34%),
+    linear-gradient(155deg, #245f40 0%, #174d34 48%, #103a29 100%);
+}
+
+.auth-academic-grid {
+  background-image:
+    linear-gradient(rgb(245 246 226 / 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(245 246 226 / 0.055) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, transparent 4%, black 24%, black 80%, transparent 100%);
+}
+
+@keyframes weekly-step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.weekly-step-enter {
+  animation: weekly-step-enter 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

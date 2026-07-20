@@ -1,13 +1,26 @@
 const buttonVariants = {
-  primary: "bg-[#4b8360] text-white shadow-[0_5px_14px_rgba(37,89,58,0.24)] hover:bg-[#427756] focus-visible:outline-[#285d3b] disabled:cursor-not-allowed disabled:bg-[#afc0b3] disabled:shadow-none disabled:hover:bg-[#afc0b3]",
-  secondary: "border border-[#b7c8bb] bg-white text-[#326d46] shadow-[0_2px_4px_rgba(32,48,57,0.07)] hover:bg-[#f3f8f2] focus-visible:outline-[#4b8360]"
+  primary: "bg-brand text-white shadow-[0_6px_18px_rgb(34_90_56_/_0.2)] hover:bg-brand-hover active:translate-y-px focus-visible:outline-brand-deep disabled:bg-line-strong disabled:shadow-none disabled:hover:bg-line-strong",
+  secondary: "border border-line-strong bg-surface text-brand-deep shadow-field hover:border-brand/40 hover:bg-brand-wash active:translate-y-px focus-visible:outline-brand",
 };
 
-function Button({ children, className = "", type = "button", variant = "primary", ...props }) {
+const buttonSizes = {
+  default: "min-h-14 px-5 text-base",
+  compact: "min-h-11 px-4 text-sm",
+};
+
+function Button({
+  children,
+  className = "",
+  fullWidth = true,
+  size = "default",
+  type = "button",
+  variant = "primary",
+  ...props
+}) {
   return (
     <button
       type={type}
-      className={`h-16 w-full rounded-[15px] text-lg font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 ${buttonVariants[variant]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-xl font-semibold transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-70 ${fullWidth ? "w-full" : ""} ${buttonSizes[size]} ${buttonVariants[variant]} ${className}`}
       {...props}
     >
       {children}
