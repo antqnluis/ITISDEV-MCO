@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+@keyframes weekly-step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.weekly-step-enter {
+  animation: weekly-step-enter 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weekly-step-enter {
+    animation: none;
+  }
+}
