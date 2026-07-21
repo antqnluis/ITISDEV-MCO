@@ -1,4 +1,4 @@
-import CenteredAuthLayout from "../components/layout/CenteredAuthLayout";
+import AppShell from "../components/layout/AppShell";
 import PageHeader from "../components/ui/PageHeader";
 import WellnessCard from "../components/ui/WellnessCard";
 import MetricCard from "../components/ui/MetricCard";
@@ -32,8 +32,8 @@ function Dashboard() {
   ];
 
   return (
-    <CenteredAuthLayout>
-      <div className="w-full max-w-[1100px]">
+    <AppShell>
+      <div className="mx-auto w-full max-w-[1100px]">
         <div className="text-center">
           <PageHeader
             title="Good afternoon, Pauline."
@@ -60,7 +60,7 @@ function Dashboard() {
           ))}
         </div>
       </div>
-    </CenteredAuthLayout>
+    </AppShell>
   );
 }
 
