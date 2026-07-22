@@ -17,7 +17,7 @@ function CourseSection({ course, records, onAddRecord }) {
                 <p className="text-xs font-bold uppercase tracking-[0.13em] text-[#789087]">Academic records</p>
                 <div className="mt-3 space-y-3">
                     {records.length ? records.map((record) => <AcademicRecordCard key={record.id} record={record} />) : (
-                        <div className="rounded-xl bg-[#f5f7f5] px-4 py-5 text-sm text-[#718078]">No academic records yet. Add an assignment, quiz, exam, or other course requirement.</div>
+                        <div className="rounded-xl bg-[#f5f7f5] px-4 py-5 text-sm text-[#718078]">No academic records yet. Add an assignment, assessment, grade snapshot, or engagement snapshot.</div>
                     )}
                 </div>
             </div>

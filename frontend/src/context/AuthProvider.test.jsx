@@ -33,6 +33,22 @@ function CompletionProbe() {
   return <button type="button" onClick={complete}>{result || "complete onboarding"}</button>;
 }
 
+function AuthenticatedRequestProbe() {
+  const { authenticatedRequest } = useAuth();
+  const [result, setResult] = useState("");
+
+  async function requestCourses() {
+    try {
+      const response = await authenticatedRequest("/api/courses?limit=100&offset=0");
+      setResult(String(response.courses.length));
+    } catch (error) {
+      setResult(error.message);
+    }
+  }
+
+  return <button type="button" onClick={requestCourses}>{result || "request courses"}</button>;
+}
+
 const storedAccount = {
   session: { access_token: "access-token", expires_at: 2_000_000_000 },
   user: { id: "student-1", email: "student@example.com" },
@@ -170,6 +186,47 @@ describe("AuthProvider hydration", () => {
     render(<AuthProvider><Probe /><CompletionProbe /></AuthProvider>);
     await screen.findByText("authenticated:/onboarding:/onboarding:Cached");
     await user.click(screen.getByRole("button", { name: "complete onboarding" }));
+
+    expect(await screen.findByText("unauthenticated:/:/dashboard:none")).toBeInTheDocument();
+    expect(window.sessionStorage).toHaveLength(0);
+  });
+
+  it("adds the current bearer token to authenticated resource requests", async () => {
+    const user = userEvent.setup();
+    writeStoredAuth(storedAccount);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        user: storedAccount.user,
+        student: storedAccount.student,
+      }))
+      .mockResolvedValueOnce(jsonResponse({ courses: [], pagination: { has_more: false } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AuthProvider><AuthenticatedRequestProbe /></AuthProvider>);
+    await user.click(await screen.findByRole("button", { name: "request courses" }));
+
+    expect(await screen.findByRole("button", { name: "0" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/courses\?limit=100&offset=0$/);
+    expect(fetchMock.mock.calls[1][1].headers).toMatchObject({
+      Authorization: "Bearer access-token",
+    });
+  });
+
+  it("clears authentication when an authenticated resource request returns 401", async () => {
+    const user = userEvent.setup();
+    writeStoredAuth(storedAccount);
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        user: storedAccount.user,
+        student: storedAccount.student,
+      }))
+      .mockResolvedValueOnce(jsonResponse({ message: "Invalid or expired access token" }, 401)));
+
+    render(<AuthProvider><Probe /><AuthenticatedRequestProbe /></AuthProvider>);
+    await screen.findByText("authenticated:/dashboard:/dashboard:Cached");
+    await user.click(screen.getByRole("button", { name: "request courses" }));
 
     expect(await screen.findByText("unauthenticated:/:/dashboard:none")).toBeInTheDocument();
     expect(window.sessionStorage).toHaveLength(0);

@@ -7,7 +7,7 @@ import {
   resolveAccountDestination,
   submitConsent,
 } from "../services/authApi";
-import { ApiError } from "../services/apiClient";
+import { ApiError, apiRequest } from "../services/apiClient";
 import { createStudentProfile } from "../services/profileApi";
 import {
   DEFAULT_POST_CONSENT_DESTINATION,
@@ -133,6 +133,23 @@ export function AuthProvider({ children }) {
     return () => window.clearTimeout(timeoutId);
   }, [authState.status, clearAuthentication]);
 
+  const authenticatedRequest = useCallback(async (path, options = {}) => {
+    const token = sessionRef.current?.access_token;
+    if (!token) {
+      clearAuthentication();
+      throw new ApiError("Your session has expired. Please sign in again.", 401);
+    }
+
+    try {
+      return await apiRequest(path, { ...options, token });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearAuthentication();
+      }
+      throw error;
+    }
+  }, [clearAuthentication]);
+
   const login = useCallback(async (credentials) => {
     const authenticated = await loginAccount(credentials);
     const current = await getCurrentAccount(authenticated.session.access_token);
@@ -226,11 +243,12 @@ export function AuthProvider({ children }) {
   const value = useMemo(() => ({
     ...authState,
     acceptConsent,
+    authenticatedRequest,
     completeOnboarding,
     login,
     logout,
     register,
-  }), [acceptConsent, authState, completeOnboarding, login, logout, register]);
+  }), [acceptConsent, authenticatedRequest, authState, completeOnboarding, login, logout, register]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
