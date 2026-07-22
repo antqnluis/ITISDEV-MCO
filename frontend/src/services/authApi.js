@@ -42,7 +42,7 @@ export function logoutAccount(token) {
   });
 }
 
-export function resolveAccountDestination(student) {
+export function resolveAccountDestination(student, postConsentDestination = "/dashboard") {
   if (!hasCurrentConsent(student)) return "/consent";
-  return "/dashboard";
+  return postConsentDestination === "/onboarding" ? "/onboarding" : "/dashboard";
 }

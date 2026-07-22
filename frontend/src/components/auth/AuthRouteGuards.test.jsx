@@ -2,12 +2,13 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { AuthContext } from "../../context/authContext";
-import { PublicOnlyRoute, RequireAuth } from "./AuthRouteGuards";
+import { OnboardingOnlyRoute, PublicOnlyRoute, RequireAuth } from "./AuthRouteGuards";
 
 function authValue(overrides = {}) {
   return {
     status: "authenticated",
     accountDestination: "/dashboard",
+    postConsentDestination: "/dashboard",
     user: { email: "student@example.com" },
     student: {
       first_name: "Jamie",
@@ -16,6 +17,7 @@ function authValue(overrides = {}) {
       privacy_notice_version: "v1.0",
     },
     acceptConsent: vi.fn(),
+    completeOnboarding: vi.fn(),
     login: vi.fn(),
     logout: vi.fn(),
     register: vi.fn(),
@@ -68,5 +70,41 @@ describe("authentication route guards", () => {
       </AuthContext.Provider>,
     );
     expect(screen.getByText("dashboard page")).toBeInTheDocument();
+  });
+
+  it("redirects completed students away from onboarding", () => {
+    render(
+      <AuthContext.Provider value={authValue()}>
+        <MemoryRouter initialEntries={["/onboarding"]}>
+          <Routes>
+            <Route path="/onboarding" element={<OnboardingOnlyRoute><p>onboarding page</p></OnboardingOnlyRoute>} />
+            <Route path="/dashboard" element={<p>dashboard page</p>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+
+    expect(screen.getByText("dashboard page")).toBeInTheDocument();
+  });
+
+  it("keeps a mounted onboarding flow visible when completion state changes", () => {
+    const pendingValue = authValue({ postConsentDestination: "/onboarding" });
+    const route = (
+      <MemoryRouter initialEntries={["/onboarding"]}>
+        <Routes>
+          <Route path="/onboarding" element={<OnboardingOnlyRoute><p>onboarding page</p></OnboardingOnlyRoute>} />
+          <Route path="/dashboard" element={<p>dashboard page</p>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const { rerender } = render(
+      <AuthContext.Provider value={pendingValue}>{route}</AuthContext.Provider>,
+    );
+
+    expect(screen.getByText("onboarding page")).toBeInTheDocument();
+    rerender(
+      <AuthContext.Provider value={authValue()}>{route}</AuthContext.Provider>,
+    );
+    expect(screen.getByText("onboarding page")).toBeInTheDocument();
   });
 });

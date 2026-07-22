@@ -63,6 +63,10 @@ describe("auth API", () => {
       consent_given: true,
       privacy_notice_version: "v1.0",
     })).toBe("/dashboard");
+    expect(resolveAccountDestination({
+      consent_given: true,
+      privacy_notice_version: "v1.0",
+    }, "/onboarding")).toBe("/onboarding");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

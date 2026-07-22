@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
+import { useState } from "react";
 import { hasCurrentConsent } from "../../services/authApi";
 import { useAuth } from "../../context/useAuth";
 
@@ -34,6 +35,19 @@ export function RequireAuth({ children, requireConsent = false }) {
   }
   if (requireConsent && !hasCurrentConsent(student)) {
     return <Navigate to="/consent" replace />;
+  }
+
+  return children;
+}
+
+export function OnboardingOnlyRoute({ children }) {
+  const { postConsentDestination } = useAuth();
+  const [wasOnboardingPending] = useState(() => (
+    postConsentDestination === "/onboarding"
+  ));
+
+  if (!wasOnboardingPending) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;

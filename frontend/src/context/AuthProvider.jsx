@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getCurrentAccount,
-  hasCurrentConsent,
   loginAccount,
   logoutAccount,
   registerAccount,
@@ -9,6 +8,7 @@ import {
   submitConsent,
 } from "../services/authApi";
 import { ApiError } from "../services/apiClient";
+import { createStudentProfile } from "../services/profileApi";
 import {
   DEFAULT_POST_CONSENT_DESTINATION,
   clearStoredAuth,
@@ -73,7 +73,10 @@ export function AuthProvider({ children }) {
     async function hydrateAuthentication() {
       try {
         const current = await getCurrentAccount(storedAuth.session.access_token);
-        const destination = resolveAccountDestination(current.student);
+        const destination = resolveAccountDestination(
+          current.student,
+          storedAuth.postConsentDestination,
+        );
 
         if (!cancelled) {
           commitAuthentication({
@@ -91,7 +94,10 @@ export function AuthProvider({ children }) {
               status: "authenticated",
               user: storedAuth.user,
               student: storedAuth.student,
-              accountDestination: hasCurrentConsent(storedAuth.student) ? "/dashboard" : "/consent",
+              accountDestination: resolveAccountDestination(
+                storedAuth.student,
+                storedAuth.postConsentDestination,
+              ),
               postConsentDestination: storedAuth.postConsentDestination,
             });
           } else {
@@ -175,6 +181,36 @@ export function AuthProvider({ children }) {
     }
   }, [authState.postConsentDestination, authState.student, authState.user, clearAuthentication, commitAuthentication]);
 
+  const completeOnboarding = useCallback(async (payload) => {
+    const token = sessionRef.current?.access_token;
+    if (!token) {
+      clearAuthentication();
+      throw new ApiError("Your session has expired. Please sign in again.", 401);
+    }
+
+    try {
+      await createStudentProfile(token, payload);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearAuthentication();
+        throw error;
+      }
+
+      if (!(error instanceof ApiError) || error.status !== 409) {
+        throw error;
+      }
+    }
+
+    commitAuthentication({
+      session: sessionRef.current,
+      student: authState.student,
+      user: authState.user,
+      postConsentDestination: "/dashboard",
+    }, "/dashboard");
+
+    return "/dashboard";
+  }, [authState.student, authState.user, clearAuthentication, commitAuthentication]);
+
   const logout = useCallback(async () => {
     const token = sessionRef.current?.access_token;
 
@@ -190,10 +226,11 @@ export function AuthProvider({ children }) {
   const value = useMemo(() => ({
     ...authState,
     acceptConsent,
+    completeOnboarding,
     login,
     logout,
     register,
-  }), [acceptConsent, authState, login, logout, register]);
+  }), [acceptConsent, authState, completeOnboarding, login, logout, register]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
