@@ -2,8 +2,10 @@ import AppShell from "../components/layout/AppShell";
 import PageHeader from "../components/ui/PageHeader";
 import WellnessCard from "../components/ui/WellnessCard";
 import MetricCard from "../components/ui/MetricCard";
+import { useAuth } from "../context/useAuth";
 
 function Dashboard() {
+  const { student } = useAuth();
   const metrics = [
     {
       title: "Academic Engagement",
@@ -36,7 +38,7 @@ function Dashboard() {
       <div className="mx-auto w-full max-w-[1100px]">
         <div className="text-center">
           <PageHeader
-            title="Good afternoon, Pauline."
+            title={`Welcome back, ${student.first_name}.`}
             subtitle="Here's how you're doing this week."
             className="text-center"
           />

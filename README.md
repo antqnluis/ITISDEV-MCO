@@ -98,9 +98,12 @@ Open a new terminal:
 ```sh
 cd frontend
 npm install
+cp .env.example .env.local
 ```
 
 This installs all required frontend dependencies.
+
+`VITE_API_BASE_URL` defaults to `http://localhost:9999`. Set it in `frontend/.env.local` when the backend runs at a different URL.
 
 #### Start the Frontend
 
@@ -177,6 +180,8 @@ http://localhost:5173
 ```
 
 Make sure the backend server is already running before using the frontend.
+
+The frontend stores the active access token in browser session storage, restores it after a page refresh, and clears it when the tab closes or the token expires. Registration continues through privacy consent to onboarding. Returning students with current consent go directly to the dashboard; missing or outdated consent is collected before dashboard access.
 
 ### Test with Thunder Client
 

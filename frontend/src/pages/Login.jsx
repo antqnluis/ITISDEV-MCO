@@ -1,13 +1,51 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import SplitAuthLayout from "../components/layout/SplitAuthLayout";
 import Button from "../components/ui/Button";
 import PageHeader from "../components/ui/PageHeader";
 import PasswordInput from "../components/ui/PasswordInput";
 import TextInput from "../components/ui/TextInput";
+import { useAuth } from "../context/useAuth";
+import { validateLogin } from "../services/authValidation";
 
 function Login() {
-  function handleSubmit(event) {
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  function updateField(event) {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [name]: value }));
+    setErrors((current) => ({ ...current, [name]: undefined }));
+    setFormError("");
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault();
+    const nextErrors = validateLogin(form);
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError("");
+
+    try {
+      const destination = await login({
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+      });
+      navigate(destination, { replace: true });
+    } catch (error) {
+      setFormError(error.message || "Unable to sign in. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function handleForgotPassword(event) {
@@ -24,6 +62,12 @@ function Login() {
         />
 
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          {formError && (
+            <div role="alert" aria-live="polite" className="rounded-xl border border-danger/25 bg-[#fff3f1] px-4 py-3 text-sm font-medium text-danger">
+              {formError}
+            </div>
+          )}
+
           <TextInput
             id="email"
             label="University Email"
@@ -31,6 +75,10 @@ function Login() {
             type="email"
             placeholder="Enter your DLSU email"
             autoComplete="email"
+            value={form.email}
+            onChange={updateField}
+            error={errors.email}
+            disabled={isSubmitting}
           />
 
           <PasswordInput
@@ -44,9 +92,15 @@ function Login() {
             name="password"
             placeholder="Enter your password"
             autoComplete="current-password"
+            value={form.password}
+            onChange={updateField}
+            error={errors.password}
+            disabled={isSubmitting}
           />
 
-          <Button type="submit" className="mt-2">Continue</Button>
+          <Button type="submit" className="mt-2" disabled={isSubmitting}>
+            {isSubmitting ? "Signing in…" : "Continue"}
+          </Button>
         </form>
 
         <div className="my-8 flex items-center gap-3.5 text-xs font-semibold uppercase tracking-[0.12em] text-soft" aria-label="or">
