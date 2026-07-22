@@ -30,12 +30,14 @@ const fieldLabels = {
 };
 
 const ratingFields = [
-    { key: "workload_difficulty", question: "How difficult was this course this week?", lowLabel: "Not difficult", highLabel: "Very difficult" },
-    { key: "instruction_clarity", question: "How clear were the instructions?", lowLabel: "Very unclear", highLabel: "Very clear" },
-    { key: "grading_concern_level", question: "How concerned are you about your grade?", lowLabel: "Not concerned", highLabel: "Very concerned" },
-    { key: "professor_approachability", question: "How approachable was your professor?", lowLabel: "Not approachable", highLabel: "Very approachable" },
-    { key: "groupmate_cooperation", question: "How cooperative were your groupmates?", lowLabel: "Not cooperative", highLabel: "Very cooperative" },
+    { key: "workload_difficulty", group: "Academic Demands", question: "Workload", lowLabel: "Not difficult", highLabel: "Very difficult" },
+    { key: "instruction_clarity", group: "Teaching", question: "Instructions", lowLabel: "Very unclear", highLabel: "Very clear" },
+    { key: "grading_concern_level", group: "Learning Experience", question: "Grade Concerns", lowLabel: "Not concerned", highLabel: "Very concerned" },
+    { key: "professor_approachability", group: "Teaching", question: "Professor", lowLabel: "Not approachable", highLabel: "Very approachable" },
+    { key: "groupmate_cooperation", group: "Learning Experience", question: "Groupmates", lowLabel: "Not cooperative", highLabel: "Very cooperative" },
 ];
+
+const ratingGroups = ["Academic Demands", "Teaching", "Learning Experience"];
 
 function createCourseLog(course, existingLog) {
     return {
@@ -63,7 +65,7 @@ function CourseEnvironmentStep({ courseLogs, setCourseLogs }) {
         <WizardStep stepKey="course-environment">
             <div>
                 <h3 className="font-display text-2xl font-semibold tracking-[-0.025em] text-ink">Course Environment</h3>
-                <p className="mt-2 text-sm leading-6 text-copy sm:text-base">Reflect on how each of your courses felt this week. These answers describe this week&apos;s experience only and help personalize your wellness insights.</p>
+                <p className="mt-2 text-sm leading-6 text-copy sm:text-base">Reflect on your experience in each course this week. These responses help explain how your academic environment may have affected your wellbeing.</p>
 
                 <div className="mt-7 space-y-5">
                     {courseLogs.length === 0 ? (
@@ -74,21 +76,29 @@ function CourseEnvironmentStep({ courseLogs, setCourseLogs }) {
                         <section key={course.course_id} className="surface-card p-5 sm:p-6">
                             <p className="text-xs font-bold uppercase tracking-[0.13em] text-brand">{course.course_code}</p>
                             <h4 className="mt-1 font-display text-xl font-semibold tracking-[-0.02em] text-ink">{course.course_name}</h4>
-                            <div className="mt-6 space-y-8">
-                                {ratingFields.map((field) => (
-                                    <RatingQuestion
-                                        key={field.key}
-                                        id={`${course.course_id}-${field.key}`}
-                                        question={field.question}
-                                        value={course[field.key]}
-                                        onChange={(value) => updateCourseLog(course.course_id, field.key, value)}
-                                        lowLabel={field.lowLabel}
-                                        highLabel={field.highLabel}
-                                    />
+                            <div className="mt-5 space-y-5">
+                                {ratingGroups.map((group) => (
+                                    <div key={group}>
+                                        <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.13em] text-soft">{group}</p>
+                                        <div className="space-y-5">
+                                            {ratingFields.filter((field) => field.group === group).map((field) => (
+                                                <RatingQuestion
+                                                    key={field.key}
+                                                    id={`${course.course_id}-${field.key}`}
+                                                    question={field.question}
+                                                    value={course[field.key]}
+                                                    onChange={(value) => updateCourseLog(course.course_id, field.key, value)}
+                                                    lowLabel={field.lowLabel}
+                                                    highLabel={field.highLabel}
+                                                    compact
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
-                            <div className="mt-8 border-t border-line pt-6">
-                                <label htmlFor={`${course.course_id}-notes`} className="font-display text-xl font-semibold tracking-[-0.02em] text-ink">Anything else about this course this week?</label>
+                            <div className="mt-6 border-t border-line pt-5">
+                                <label htmlFor={`${course.course_id}-notes`} className="text-base font-semibold text-copy">Anything else about this course this week?</label>
                                 <p className="mt-2 text-sm text-copy">Optional</p>
                                 <textarea id={`${course.course_id}-notes`} rows={3} maxLength={4000} value={course.concern_notes} onChange={(event) => updateCourseLog(course.course_id, "concern_notes", event.target.value)} className="form-control mt-4 min-h-28 resize-y p-3 text-sm leading-6" placeholder="Add any other course-related context from this week." />
                             </div>

@@ -1,14 +1,14 @@
 const ratings = [1, 2, 3, 4, 5];
 
-function RatingQuestion({ id, question, helper, value, onChange, lowLabel, highLabel, error }) {
+function RatingQuestion({ id, question, helper, value, onChange, lowLabel, highLabel, error, compact = false }) {
   return (
     <fieldset aria-describedby={helper ? `${id}-helper` : undefined}>
-      <legend className="font-display text-2xl font-semibold leading-tight tracking-[-0.025em] text-ink">
+      <legend className={`${compact ? "text-lg" : "text-2xl"} font-display font-semibold leading-tight tracking-[-0.025em] text-ink`}>
         {question}
       </legend>
       {helper && <p id={`${id}-helper`} className="mt-2 text-sm leading-6 text-copy sm:text-base">{helper}</p>}
 
-      <div className="mt-5 grid grid-cols-5 gap-2 sm:gap-2.5" aria-invalid={Boolean(error)}>
+      <div className={`${compact ? "mt-3" : "mt-5"} grid grid-cols-5 gap-2 sm:gap-2.5`} aria-invalid={Boolean(error)}>
         {ratings.map((rating) => (
           <label key={rating} className="cursor-pointer">
             <input
@@ -26,7 +26,7 @@ function RatingQuestion({ id, question, helper, value, onChange, lowLabel, highL
         ))}
       </div>
 
-      <div className="mt-3 flex justify-between gap-4 text-xs font-medium text-soft sm:text-sm">
+      <div className={`${compact ? "mt-2" : "mt-3"} flex justify-between gap-4 text-xs font-medium text-soft sm:text-sm`}>
         <span>{lowLabel}</span>
         <span>{highLabel}</span>
       </div>
