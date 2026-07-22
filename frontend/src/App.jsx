@@ -1,7 +1,12 @@
 import AppRouter from "./router/AppRouter";
+import { PrototypeDataProvider } from "./context/PrototypeDataContext";
 
 function App() {
-  return <AppRouter />;
+  return (
+    <PrototypeDataProvider>
+      <AppRouter />
+    </PrototypeDataProvider>
+  );
 }
 
 export default App;
