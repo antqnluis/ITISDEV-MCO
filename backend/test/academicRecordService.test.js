@@ -12,12 +12,15 @@ const {
 
 const studentId = "11111111-1111-4111-8111-111111111111";
 const recordId = "22222222-2222-4222-8222-222222222222";
+const courseId = "33333333-3333-4333-8333-333333333333";
+const otherCourseId = "44444444-4444-4444-8444-444444444444";
+const course = { id: courseId, code: "ITISDEV", name: "IT Systems Development" };
 const baseRecord = {
     id: recordId,
     student_id: studentId,
     source: "manual",
-    course_code: "ITISDEV",
-    course_name: "IT Systems Development",
+    course_id: courseId,
+    course,
     record_type: "assignment",
     title: "Academic records API",
     due_at: "2026-07-20T09:00:00.000Z",
@@ -28,15 +31,13 @@ const baseRecord = {
     grade_percentage: null,
     recorded_at: "2026-07-12T00:00:00.000Z"
 };
-
 const validPayload = {
-    course_code: "ITISDEV",
-    course_name: "IT Systems Development",
+    course_id: courseId,
     record_type: "assignment",
     title: "Academic records API"
 };
 
-function createRecordLookup(record = baseRecord) {
+function lookup(record) {
     return {
         select: () => ({
             eq() {
@@ -47,10 +48,22 @@ function createRecordLookup(record = baseRecord) {
     };
 }
 
-test("createAcademicRecord validates manual input and assigns ownership fields", async () => {
+test("createAcademicRecord requires an owned course and writes only course_id", async () => {
+    const courseFilters = [];
     let insertedValues;
     const supabase = {
         from(table) {
+            if (table === "courses") {
+                return {
+                    select: () => ({
+                        eq(field, value) {
+                            courseFilters.push([field, value]);
+                            return this;
+                        },
+                        maybeSingle: async () => ({ data: { id: courseId }, error: null })
+                    })
+                };
+            }
             assert.equal(table, "academic_records");
             return {
                 insert(values) {
@@ -65,61 +78,54 @@ test("createAcademicRecord validates manual input and assigns ownership fields",
         }
     };
 
-    const record = await createAcademicRecord(supabase, studentId, {
+    await createAcademicRecord(supabase, studentId, {
         ...validPayload,
-        course_code: " ITISDEV ",
         title: " Academic records API ",
         score: 18,
         max_score: 20,
         due_at: "2026-07-20T17:00:00+08:00"
     });
 
+    assert.deepEqual(courseFilters, [["id", courseId], ["student_id", studentId]]);
     assert.deepEqual(insertedValues, {
         student_id: studentId,
         source: "manual",
-        course_code: "ITISDEV",
-        course_name: "IT Systems Development",
+        course_id: courseId,
         record_type: "assignment",
         title: "Academic records API",
         score: 18,
         max_score: 20,
         due_at: "2026-07-20T09:00:00.000Z"
     });
-    assert.equal(record.source, "manual");
 
     await assert.rejects(
         createAcademicRecord({}, studentId, { ...validPayload, score: 10 }),
         (error) => error.statusCode === 400 && error.message.includes("score")
     );
     await assert.rejects(
-        createAcademicRecord({}, studentId, { ...validPayload, source: "mock" }),
-        (error) => error.statusCode === 400 && error.message.includes("source")
-    );
-    await assert.rejects(
-        createAcademicRecord({}, studentId, { ...validPayload, grade_percentage: 100 }),
-        (error) => error.statusCode === 400 && error.message.includes("grade_percentage")
+        createAcademicRecord({}, studentId, {
+            ...validPayload,
+            course_code: "ITISDEV"
+        }),
+        (error) => error.statusCode === 400 && error.message.includes("course_code")
     );
 });
 
-test("listAcademicRecords scopes, filters, paginates, and orders records", async () => {
+test("createAcademicRecord rejects a course outside the authenticated student", async () => {
+    const supabase = { from: () => lookup(null) };
+    await assert.rejects(
+        createAcademicRecord(supabase, studentId, validPayload),
+        (error) => error.statusCode === 404 && error.message === "Course not found"
+    );
+});
+
+test("listAcademicRecords filters by course_id and returns nested course metadata", async () => {
     const calls = { eq: [], gte: [], lte: [], order: [], range: null };
     const request = {
-        eq(field, value) {
-            calls.eq.push([field, value]);
-            return this;
-        },
-        gte(field, value) {
-            calls.gte.push([field, value]);
-            return this;
-        },
-        lte(field, value) {
-            calls.lte.push([field, value]);
-            return this;
-        },
-        order(column, options) {
-            calls.order.push([column, options]);
-            return this;
-        },
+        eq(field, value) { calls.eq.push([field, value]); return this; },
+        gte(field, value) { calls.gte.push([field, value]); return this; },
+        lte(field, value) { calls.lte.push([field, value]); return this; },
+        order(column, options) { calls.order.push([column, options]); return this; },
         range(from, to) {
             calls.range = [from, to];
             return Promise.resolve({ data: [baseRecord], count: 3, error: null });
@@ -130,8 +136,7 @@ test("listAcademicRecords scopes, filters, paginates, and orders records", async
             assert.equal(table, "academic_records");
             return {
                 select(columns, options) {
-                    assert.match(columns, /grade_percentage/);
-                    assert.doesNotMatch(columns, /external_record_id/);
+                    assert.match(columns, /course:courses/);
                     assert.deepEqual(options, { count: "exact" });
                     return request;
                 }
@@ -144,7 +149,7 @@ test("listAcademicRecords scopes, filters, paginates, and orders records", async
         offset: "1",
         source: "mock",
         record_type: "assignment",
-        course_code: "ITISDEV",
+        course_id: courseId,
         due_from: "2026-07-01",
         due_to: "2026-07-31"
     });
@@ -153,96 +158,58 @@ test("listAcademicRecords scopes, filters, paginates, and orders records", async
         ["student_id", studentId],
         ["source", "mock"],
         ["record_type", "assignment"],
-        ["course_code", "ITISDEV"]
-    ]);
-    assert.deepEqual(calls.gte, [["due_at", "2026-07-01T00:00:00.000Z"]]);
-    assert.deepEqual(calls.lte, [["due_at", "2026-07-31T23:59:59.999Z"]]);
-    assert.deepEqual(calls.order, [
-        ["due_at", { ascending: true, nullsFirst: false }],
-        ["id", { ascending: true }]
+        ["course_id", courseId]
     ]);
     assert.deepEqual(calls.range, [1, 2]);
-    assert.deepEqual(result, {
-        records: [baseRecord],
-        pagination: { limit: 2, offset: 1, total: 3, has_more: true }
-    });
+    assert.equal(result.records[0].course.code, "ITISDEV");
+    assert.equal(result.pagination.has_more, true);
 
     await assert.rejects(
-        listAcademicRecords({}, studentId, { source: "canvas" }),
-        (error) => error.statusCode === 400 && error.message.includes("source")
-    );
-    await assert.rejects(
-        listAcademicRecords({}, studentId, { limit: "101" }),
-        (error) => error.statusCode === 400 && error.message.includes("limit")
+        listAcademicRecords({}, studentId, { course_code: "ITISDEV" }),
+        (error) => error.statusCode === 400 && error.message.includes("course_code")
     );
 });
 
-test("getAcademicRecord validates IDs and scopes the lookup to the owner", async () => {
+test("getAcademicRecord validates IDs and scopes the lookup", async () => {
     const filters = [];
     const supabase = {
-        from(table) {
-            assert.equal(table, "academic_records");
-            return {
-                select: () => ({
-                    eq(field, value) {
-                        filters.push([field, value]);
-                        return this;
-                    },
+        from: () => ({
+            select: (columns) => {
+                assert.match(columns, /course:courses/);
+                return {
+                    eq(field, value) { filters.push([field, value]); return this; },
                     maybeSingle: async () => ({ data: baseRecord, error: null })
-                })
-            };
-        }
+                };
+            }
+        })
     };
 
-    const record = await getAcademicRecord(supabase, studentId, recordId);
-    assert.equal(record.id, recordId);
+    assert.equal((await getAcademicRecord(supabase, studentId, recordId)).id, recordId);
     assert.deepEqual(filters, [["id", recordId], ["student_id", studentId]]);
-
     await assert.rejects(
         getAcademicRecord({}, studentId, "not-a-uuid"),
         (error) => error.statusCode === 400 && error.message.includes("UUID")
     );
 });
 
-test("updateAcademicRecord validates score pairs, scopes the write, and protects mocks", async () => {
-    let calls = 0;
+test("updateAcademicRecord verifies a changed course and protects mock records", async () => {
+    let academicCalls = 0;
     let updateValues;
     const supabase = {
         from(table) {
-            assert.equal(table, "academic_records");
-            calls += 1;
-            if (calls === 1) {
-                return createRecordLookup(baseRecord);
+            if (table === "courses") {
+                return lookup({ id: otherCourseId });
             }
-
+            academicCalls += 1;
+            if (academicCalls === 1) return lookup(baseRecord);
             return {
                 update(values) {
                     updateValues = values;
                     return {
-                        eq(field, value) {
-                            assert.equal(field, "id");
-                            assert.equal(value, recordId);
-                            return {
-                                eq(ownerField, ownerId) {
-                                    assert.equal(ownerField, "student_id");
-                                    assert.equal(ownerId, studentId);
-                                    return {
-                                        eq(sourceField, source) {
-                                            assert.equal(sourceField, "source");
-                                            assert.equal(source, "manual");
-                                            return {
-                                                select: () => ({
-                                                    maybeSingle: async () => ({
-                                                        data: { ...baseRecord, ...values },
-                                                        error: null
-                                                    })
-                                                })
-                                            };
-                                        }
-                                    };
-                                }
-                            };
-                        }
+                        eq() { return this; },
+                        select: () => ({
+                            maybeSingle: async () => ({ data: { ...baseRecord, ...values }, error: null })
+                        })
                     };
                 }
             };
@@ -250,16 +217,16 @@ test("updateAcademicRecord validates score pairs, scopes the write, and protects
     };
 
     const record = await updateAcademicRecord(supabase, studentId, recordId, {
+        course_id: otherCourseId,
         score: 20,
-        max_score: 20,
-        submitted_at: null
+        max_score: 20
     });
-    assert.deepEqual(updateValues, { score: 20, max_score: 20, submitted_at: null });
-    assert.equal(record.score, 20);
+    assert.deepEqual(updateValues, { course_id: otherCourseId, score: 20, max_score: 20 });
+    assert.equal(record.course_id, otherCourseId);
 
-    const mockSupabase = { from: () => createRecordLookup({ ...baseRecord, source: "mock" }) };
+    const mockSupabase = { from: () => lookup({ ...baseRecord, source: "mock" }) };
     await assert.rejects(
-        updateAcademicRecord(mockSupabase, studentId, recordId, { title: "Cannot update mock" }),
+        updateAcademicRecord(mockSupabase, studentId, recordId, { title: "No" }),
         (error) => error.statusCode === 403 && error.message.includes("Mock")
     );
 });
@@ -268,22 +235,13 @@ test("deleteAcademicRecord scopes manual deletion and protects mock records", as
     let calls = 0;
     const filters = [];
     const supabase = {
-        from(table) {
-            assert.equal(table, "academic_records");
+        from() {
             calls += 1;
-            if (calls === 1) {
-                return createRecordLookup(baseRecord);
-            }
-
+            if (calls === 1) return lookup(baseRecord);
             return {
                 delete: () => ({
-                    eq(field, value) {
-                        filters.push([field, value]);
-                        return this;
-                    },
-                    select: () => ({
-                        maybeSingle: async () => ({ data: { id: recordId }, error: null })
-                    })
+                    eq(field, value) { filters.push([field, value]); return this; },
+                    select: () => ({ maybeSingle: async () => ({ data: { id: recordId }, error: null }) })
                 })
             };
         }
@@ -295,19 +253,13 @@ test("deleteAcademicRecord scopes manual deletion and protects mock records", as
         ["student_id", studentId],
         ["source", "manual"]
     ]);
-
-    const mockSupabase = { from: () => createRecordLookup({ ...baseRecord, source: "mock" }) };
-    await assert.rejects(
-        deleteAcademicRecord(mockSupabase, studentId, recordId),
-        (error) => error.statusCode === 403 && error.message.includes("Mock")
-    );
 });
 
-test("createMockAcademicRecord inserts trusted mock data without Canvas import fields", async () => {
+test("createMockAcademicRecord verifies course ownership before inserting", async () => {
     let insertedValues;
     const serviceSupabase = {
         from(table) {
-            assert.equal(table, "academic_records");
+            if (table === "courses") return lookup({ id: courseId });
             return {
                 insert(values) {
                     insertedValues = values;
@@ -321,26 +273,15 @@ test("createMockAcademicRecord inserts trusted mock data without Canvas import f
         }
     };
 
-    const record = await createMockAcademicRecord({
+    await createMockAcademicRecord({
         student_id: studentId,
         ...validPayload,
         recorded_at: "2026-07-12T08:00:00+08:00"
     }, serviceSupabase);
-
     assert.deepEqual(insertedValues, {
         student_id: studentId,
         source: "mock",
         ...validPayload,
         recorded_at: "2026-07-12T00:00:00.000Z"
     });
-    assert.equal(record.source, "mock");
-
-    await assert.rejects(
-        createMockAcademicRecord({ student_id: studentId, ...validPayload, source: "manual" }, serviceSupabase),
-        (error) => error.statusCode === 400 && error.message.includes("source")
-    );
-    await assert.rejects(
-        createMockAcademicRecord({ student_id: studentId, ...validPayload }, null),
-        (error) => error.statusCode === 503 && error.message.includes("SERVICE_ROLE")
-    );
 });

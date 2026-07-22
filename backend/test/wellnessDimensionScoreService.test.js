@@ -58,8 +58,11 @@ const calculationProfile = {
 const calculationCourseLog = {
     id: "44444444-4444-4444-8444-444444444444",
     week_start: calculationCheckIn.week_start,
-    course_code: "ITISDEV",
-    course_name: "IT Systems Development",
+    course_id: "55555555-5555-4555-8555-555555555555",
+    course: {
+        code: "ITISDEV",
+        name: "IT Systems Development"
+    },
     workload_difficulty: 3,
     unclear_instruction_level: 3,
     grading_concern_level: 3,

@@ -2,8 +2,7 @@ const { normalizeMondayDate } = require("../utils/weekDate");
 
 const COURSE_ENVIRONMENT_LOG_FIELDS = new Set([
     "check_in_id",
-    "course_code",
-    "course_name",
+    "course_id",
     "week_start",
     "workload_difficulty",
     "unclear_instruction_level",
@@ -25,8 +24,8 @@ const COURSE_ENVIRONMENT_LOG_SELECT = [
     "id",
     "student_id",
     "check_in_id",
-    "course_code",
-    "course_name",
+    "course_id",
+    "course:courses!course_environment_course_student_fk(id, code, name)",
     "week_start",
     "workload_difficulty",
     "unclear_instruction_level",
@@ -60,14 +59,6 @@ function normalizeUuid(value, fieldName) {
     }
 
     return value;
-}
-
-function normalizeRequiredText(value, fieldName) {
-    if (typeof value !== "string" || value.trim().length === 0) {
-        throw createServiceError(`${fieldName} must be a non-empty string`);
-    }
-
-    return value.trim();
 }
 
 function normalizePaginationValue(value, fieldName, defaultValue, minimum, maximum) {
@@ -104,7 +95,7 @@ function normalizeLogInput(payload, { isCreate = false } = {}) {
     }
 
     if (isCreate) {
-        for (const field of ["course_code", "course_name", "week_start"]) {
+        for (const field of ["course_id", "week_start"]) {
             if (!hasOwn(payload, field)) {
                 throw createServiceError(`${field} is required`);
             }
@@ -113,8 +104,8 @@ function normalizeLogInput(payload, { isCreate = false } = {}) {
 
     const normalized = {};
     for (const [field, value] of Object.entries(payload)) {
-        if (field === "course_code" || field === "course_name") {
-            normalized[field] = normalizeRequiredText(value, field);
+        if (field === "course_id") {
+            normalized[field] = normalizeUuid(value, field);
             continue;
         }
 
@@ -168,7 +159,7 @@ function normalizeListOptions(query = {}) {
         throw createServiceError("Query parameters must be an object");
     }
 
-    const allowedFields = new Set(["limit", "offset", "week_start", "course_code", "check_in_id"]);
+    const allowedFields = new Set(["limit", "offset", "week_start", "course_id", "check_in_id"]);
     for (const field of Object.keys(query)) {
         if (!allowedFields.has(field)) {
             throw createServiceError(`${field} is not a supported query parameter`);
@@ -179,9 +170,9 @@ function normalizeListOptions(query = {}) {
         limit: normalizePaginationValue(query.limit, "limit", 25, 1, 100),
         offset: normalizePaginationValue(query.offset, "offset", 0, 0, 100000),
         weekStart: query.week_start === undefined ? null : normalizeMondayDate(query.week_start),
-        courseCode: query.course_code === undefined
+        courseId: query.course_id === undefined
             ? null
-            : normalizeRequiredText(query.course_code, "course_code"),
+            : normalizeUuid(query.course_id, "course_id"),
         checkInId: query.check_in_id === undefined
             ? null
             : normalizeUuid(query.check_in_id, "check_in_id")
@@ -204,6 +195,22 @@ async function assertCheckInBelongsToStudent(supabase, studentId, checkInId) {
     }
 }
 
+async function assertCourseBelongsToStudent(supabase, studentId, courseId) {
+    const { data, error } = await supabase
+        .from("courses")
+        .select("id")
+        .eq("id", courseId)
+        .eq("student_id", studentId)
+        .maybeSingle();
+
+    if (error) {
+        throw createServiceError("Unable to verify the course", 500);
+    }
+    if (!data) {
+        throw createServiceError("Course not found", 404);
+    }
+}
+
 function throwDatabaseError(error, operation) {
     if (error.code === "23505") {
         throw createServiceError("A course-environment log already exists for this course and week", 409);
@@ -215,6 +222,7 @@ function throwDatabaseError(error, operation) {
 async function createCourseEnvironmentLog(supabase, studentId, payload) {
     const log = normalizeLogInput(payload, { isCreate: true });
     assertLogHasContent(log);
+    await assertCourseBelongsToStudent(supabase, studentId, log.course_id);
     if (log.check_in_id) {
         await assertCheckInBelongsToStudent(supabase, studentId, log.check_in_id);
     }
@@ -242,8 +250,8 @@ async function listCourseEnvironmentLogs(supabase, studentId, query) {
     if (options.weekStart) {
         request = request.eq("week_start", options.weekStart);
     }
-    if (options.courseCode) {
-        request = request.eq("course_code", options.courseCode);
+    if (options.courseId) {
+        request = request.eq("course_id", options.courseId);
     }
     if (options.checkInId) {
         request = request.eq("check_in_id", options.checkInId);
@@ -251,7 +259,7 @@ async function listCourseEnvironmentLogs(supabase, studentId, query) {
 
     const { data, error, count } = await request
         .order("week_start", { ascending: false })
-        .order("course_code", { ascending: true })
+        .order("course_id", { ascending: true })
         .order("id", { ascending: true })
         .range(options.offset, options.offset + options.limit - 1);
 
@@ -296,6 +304,9 @@ async function updateCourseEnvironmentLog(supabase, studentId, logId, payload) {
     const currentLog = await getCourseEnvironmentLog(supabase, studentId, logId);
     const updatedLog = { ...currentLog, ...log };
     assertLogHasContent(updatedLog);
+    if (hasOwn(log, "course_id") && log.course_id !== currentLog.course_id) {
+        await assertCourseBelongsToStudent(supabase, studentId, log.course_id);
+    }
     if (hasOwn(log, "check_in_id") && log.check_in_id) {
         await assertCheckInBelongsToStudent(supabase, studentId, log.check_in_id);
     }

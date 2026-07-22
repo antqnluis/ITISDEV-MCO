@@ -39,8 +39,8 @@ function mapDatabaseRowToCourseEnvironmentInput(courseLog) {
     return {
         id: courseLog.id,
         weekStart: courseLog.week_start,
-        courseCode: courseLog.course_code,
-        courseName: courseLog.course_name,
+        courseCode: courseLog.course.code,
+        courseName: courseLog.course.name,
         workloadDifficulty: courseLog.workload_difficulty,
         unclearInstructionLevel: courseLog.unclear_instruction_level,
         gradingConcernLevel: courseLog.grading_concern_level,
@@ -90,8 +90,8 @@ async function loadSeededCourseEnvironmentData(supabase, studentNumber) {
         .select([
             "id",
             "student_id",
-            "course_code",
-            "course_name",
+            "course_id",
+            "course:courses!course_environment_course_student_fk(code, name)",
             "week_start",
             "workload_difficulty",
             "unclear_instruction_level",
