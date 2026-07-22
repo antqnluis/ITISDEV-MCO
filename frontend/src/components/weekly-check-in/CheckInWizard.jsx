@@ -139,7 +139,8 @@ function CheckInWizard({ initialCheckIn, existingLogs = [], onSave, onCancel }) 
         return Object.keys(nextErrors).length === 0;
     }
 
-    function handleNext() {
+    function handleNext(event) {
+        event.preventDefault();
         if (validateFields(stepFields[currentStep])) {
             setCurrentStep((step) => Math.min(totalSteps, step + 1));
         }
@@ -194,7 +195,7 @@ function CheckInWizard({ initialCheckIn, existingLogs = [], onSave, onCancel }) 
             <section className="surface-panel p-5 shadow-none sm:p-7">{renderStep()}</section>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
                 {currentStep > 1 ? <Button type="button" variant="secondary" onClick={() => setCurrentStep((step) => step - 1)} className="sm:flex-1">Back</Button> : <Button type="button" variant="secondary" onClick={onCancel} className="sm:flex-1">Cancel</Button>}
-                {currentStep < totalSteps ? <Button type="button" onClick={handleNext} className="sm:flex-1">Continue</Button> : <Button type="submit" className="sm:flex-1">{initialCheckIn ? "Save Check-in" : "Submit Check-in"}</Button>}
+                {currentStep < totalSteps ? <Button key="continue" type="button" onClick={handleNext} className="sm:flex-1">Continue</Button> : <Button key="submit" type="submit" className="sm:flex-1">{initialCheckIn ? "Save Check-in" : "Submit Check-in"}</Button>}
             </div>
         </form>
     );
