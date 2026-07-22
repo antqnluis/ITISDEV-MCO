@@ -64,7 +64,8 @@ const PROFILE_CALCULATION_SELECT = [
 const ACADEMIC_RECORD_CALCULATION_SELECT = [
     "id",
     "record_type",
-    "course_code",
+    "course_id",
+    "course:courses!academic_records_course_student_fk(code)",
     "due_at",
     "submitted_at",
     "submission_status",
@@ -75,8 +76,8 @@ const ACADEMIC_RECORD_CALCULATION_SELECT = [
 const COURSE_LOG_CALCULATION_SELECT = [
     "id",
     "week_start",
-    "course_code",
-    "course_name",
+    "course_id",
+    "course:courses!course_environment_course_student_fk(code, name)",
     "workload_difficulty",
     "unclear_instruction_level",
     "grading_concern_level",
@@ -223,8 +224,8 @@ function mapCourseLogToCalculationInput(courseLog) {
     return {
         id: courseLog.id,
         weekStart: courseLog.week_start,
-        courseCode: courseLog.course_code,
-        courseName: courseLog.course_name,
+        courseCode: courseLog.course.code,
+        courseName: courseLog.course.name,
         workloadDifficulty: courseLog.workload_difficulty,
         unclearInstructionLevel: courseLog.unclear_instruction_level,
         gradingConcernLevel: courseLog.grading_concern_level,
@@ -242,7 +243,10 @@ function runDimensionCalculators({ checkIn, profile, academicRecords, courseLogs
     try {
         return {
             academic_engagement_score: calculateAcademicEngagementScore({
-                academicRecords,
+                academicRecords: academicRecords.map((record) => ({
+                    ...record,
+                    course_code: record.course.code
+                })),
                 academicWorkload,
                 analysisDate: checkIn.week_start
             }).score,

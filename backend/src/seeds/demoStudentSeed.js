@@ -8,6 +8,12 @@ const IDS = Object.freeze({
         "20000000-0000-4000-8000-000000000002",
         "20000000-0000-4000-8000-000000000003"
     ]),
+    courses: Object.freeze({
+        ITISDEV: "25000000-0000-4000-8000-000000000001",
+        DBADMN: "25000000-0000-4000-8000-000000000002",
+        WEBAPDE: "25000000-0000-4000-8000-000000000003",
+        PROFSWD: "25000000-0000-4000-8000-000000000004"
+    }),
     academicRecords: Object.freeze([
         "30000000-0000-4000-8000-000000000001",
         "30000000-0000-4000-8000-000000000002",
@@ -42,6 +48,7 @@ const APPLICATION_TABLES = Object.freeze([
     "students",
     "student_profiles",
     "weekly_check_ins",
+    "courses",
     "academic_records",
     "calendar_events",
     "course_environment_logs",
@@ -263,13 +270,19 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
         }
     ];
 
+    const courses = [
+        { id: IDS.courses.ITISDEV, student_id: studentId, code: "ITISDEV", name: "IT Systems Development" },
+        { id: IDS.courses.DBADMN, student_id: studentId, code: "DBADMN", name: "Database Administration" },
+        { id: IDS.courses.WEBAPDE, student_id: studentId, code: "WEBAPDE", name: "Web Application Development" },
+        { id: IDS.courses.PROFSWD, student_id: studentId, code: "PROFSWD", name: "Professional Software Development" }
+    ];
+
     const academicRecords = [
         {
             id: IDS.academicRecords[0],
             student_id: studentId,
             source: "mock",
-            course_code: "ITISDEV",
-            course_name: "IT Systems Development",
+            course_id: IDS.courses.ITISDEV,
             record_type: "grade_snapshot",
             title: "Pre-midterm standing",
             due_at: null,
@@ -283,8 +296,7 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             id: IDS.academicRecords[1],
             student_id: studentId,
             source: "mock",
-            course_code: "ITISDEV",
-            course_name: "IT Systems Development",
+            course_id: IDS.courses.ITISDEV,
             record_type: "grade_snapshot",
             title: "Current midterm standing",
             due_at: null,
@@ -298,8 +310,7 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             id: IDS.academicRecords[2],
             student_id: studentId,
             source: "mock",
-            course_code: "ITISDEV",
-            course_name: "IT Systems Development",
+            course_id: IDS.courses.ITISDEV,
             record_type: "assignment",
             title: "Sprint 2 implementation",
             due_at: timestampAt(anchor, -10, "23:59:00"),
@@ -313,8 +324,7 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             id: IDS.academicRecords[3],
             student_id: studentId,
             source: "mock",
-            course_code: "DBADMN",
-            course_name: "Database Administration",
+            course_id: IDS.courses.DBADMN,
             record_type: "assignment",
             title: "Index optimization exercise",
             due_at: timestampAt(anchor, -6, "23:59:00"),
@@ -328,8 +338,7 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             id: IDS.academicRecords[4],
             student_id: studentId,
             source: "mock",
-            course_code: "WEBAPDE",
-            course_name: "Web Application Development",
+            course_id: IDS.courses.WEBAPDE,
             record_type: "assessment",
             title: "Midterm practical examination",
             due_at: timestampAt(anchor, 2, "13:00:00"),
@@ -343,8 +352,7 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             id: IDS.academicRecords[5],
             student_id: studentId,
             source: "mock",
-            course_code: "ITISDEV",
-            course_name: "IT Systems Development",
+            course_id: IDS.courses.ITISDEV,
             record_type: "assignment",
             title: "Midterm project demonstration",
             due_at: timestampAt(anchor, 4, "17:00:00"),
@@ -358,8 +366,7 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             id: IDS.academicRecords[6],
             student_id: studentId,
             source: "mock",
-            course_code: "PROFSWD",
-            course_name: "Professional Software Development",
+            course_id: IDS.courses.PROFSWD,
             record_type: "assessment",
             title: "Architecture quiz",
             due_at: timestampAt(anchor, -12, "10:00:00"),
@@ -373,8 +380,7 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             id: IDS.academicRecords[7],
             student_id: studentId,
             source: "mock",
-            course_code: "DBADMN",
-            course_name: "Database Administration",
+            course_id: IDS.courses.DBADMN,
             record_type: "engagement_snapshot",
             title: "Midterm attendance and participation",
             due_at: null,
@@ -455,21 +461,21 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
     const courseEnvironmentLogs = [
         {
             id: IDS.courseEnvironmentLogs[0], student_id: studentId, check_in_id: IDS.checkIns[2],
-            course_code: "ITISDEV", course_name: "IT Systems Development", week_start: weekStarts[2],
+            course_id: IDS.courses.ITISDEV, week_start: weekStarts[2],
             workload_difficulty: 5, unclear_instruction_level: 3, grading_concern_level: 4,
             professor_approachability_concern: 2, groupmate_issue_level: 4,
             concern_notes: "The midterm scope is large and two group members have limited availability, leaving more integration and documentation work for me."
         },
         {
             id: IDS.courseEnvironmentLogs[1], student_id: studentId, check_in_id: IDS.checkIns[2],
-            course_code: "WEBAPDE", course_name: "Web Application Development", week_start: weekStarts[2],
+            course_id: IDS.courses.WEBAPDE, week_start: weekStarts[2],
             workload_difficulty: 5, unclear_instruction_level: 4, grading_concern_level: 3,
             professor_approachability_concern: 3, groupmate_issue_level: 1,
             concern_notes: "The practical exam coverage is broad and some deployment instructions need clarification before exam day."
         },
         {
             id: IDS.courseEnvironmentLogs[2], student_id: studentId, check_in_id: IDS.checkIns[1],
-            course_code: "DBADMN", course_name: "Database Administration", week_start: weekStarts[1],
+            course_id: IDS.courses.DBADMN, week_start: weekStarts[1],
             workload_difficulty: 4, unclear_instruction_level: 2, grading_concern_level: 5,
             professor_approachability_concern: 2, groupmate_issue_level: 1,
             concern_notes: "Missing the optimization exercise significantly affected the current grade, although the lesson materials are clear."
@@ -549,6 +555,7 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             students,
             student_profiles: studentProfiles,
             weekly_check_ins: weeklyCheckIns,
+            courses,
             academic_records: academicRecords,
             calendar_events: calendarEvents,
             course_environment_logs: courseEnvironmentLogs,

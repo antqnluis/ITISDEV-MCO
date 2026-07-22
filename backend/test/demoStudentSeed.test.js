@@ -73,6 +73,7 @@ test("buildDemoStudentScenario covers every table, data field, enum, and relatio
             students: 1,
             student_profiles: 1,
             weekly_check_ins: 3,
+            courses: 4,
             academic_records: 8,
             calendar_events: 12,
             course_environment_logs: 3,
@@ -141,11 +142,14 @@ test("buildDemoStudentScenario covers every table, data field, enum, and relatio
     assert.ok(scenario.tables.calendar_events.some((event) => event.all_day));
 
     const checkInIds = new Set(scenario.tables.weekly_check_ins.map((checkIn) => checkIn.id));
+    const courseIds = new Set(scenario.tables.courses.map((course) => course.id));
     const academicRecordIds = new Set(
         scenario.tables.academic_records.map((record) => record.id)
     );
+    assert.ok(scenario.tables.academic_records.every((record) => courseIds.has(record.course_id)));
     for (const log of scenario.tables.course_environment_logs) {
         assert.ok(checkInIds.has(log.check_in_id));
+        assert.ok(courseIds.has(log.course_id));
         for (const rating of [
             "workload_difficulty",
             "unclear_instruction_level",
@@ -301,6 +305,7 @@ test("runDemoStudentSeed removes a partial public dataset after an insert failur
     assert.deepEqual(calls.inserts.map(([table]) => table), [
         "students",
         "student_profiles",
-        "weekly_check_ins"
+        "weekly_check_ins",
+        "courses"
     ]);
 });

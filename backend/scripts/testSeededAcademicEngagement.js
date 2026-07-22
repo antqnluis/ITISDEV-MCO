@@ -89,7 +89,8 @@ async function loadSeededStudentData(supabase, studentNumber) {
         .select([
             "id",
             "record_type",
-            "course_code",
+            "course_id",
+            "course:courses!academic_records_course_student_fk(code)",
             "due_at",
             "submitted_at",
             "submission_status",
@@ -117,7 +118,10 @@ async function loadSeededStudentData(supabase, studentNumber) {
 
     return {
         student,
-        academicRecords,
+        academicRecords: academicRecords.map((record) => ({
+            ...record,
+            course_code: record.course.code
+        })),
         courseLogs: courseLogs || []
     };
 }

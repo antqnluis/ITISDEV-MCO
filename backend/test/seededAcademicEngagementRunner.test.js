@@ -143,8 +143,12 @@ test("Manila date and latest-week workload selection are deterministic", () => {
 
 test("runSeededAcademicEngagement calculates the final value from seeded database rows", async () => {
     const scenario = buildDemoStudentScenario({ studentId, studentNumber, now: fixedNow });
+    const coursesById = new Map(scenario.tables.courses.map((course) => [course.id, course]));
     const { calls, supabase } = createSupabaseMock({
-        academicRecords: withGeneratedGrades(scenario.tables.academic_records),
+        academicRecords: withGeneratedGrades(scenario.tables.academic_records).map((record) => ({
+            ...record,
+            course: coursesById.get(record.course_id)
+        })),
         courseLogs: scenario.tables.course_environment_logs
             .slice()
             .sort((left, right) => right.week_start.localeCompare(left.week_start))
