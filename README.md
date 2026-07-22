@@ -209,6 +209,11 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `GET` | `/api/check-ins/:id` | Get one weekly check-in. |
 | `PATCH` | `/api/check-ins/:id` | Update one weekly check-in. |
 | `DELETE` | `/api/check-ins/:id` | Delete one weekly check-in. |
+| `POST` | `/api/courses` | Create a course for the authenticated student. |
+| `GET` | `/api/courses` | List the authenticated student's courses. |
+| `GET` | `/api/courses/:id` | Get one authenticated student's course. |
+| `PATCH` | `/api/courses/:id` | Update a course's code or name. |
+| `DELETE` | `/api/courses/:id` | Delete an unreferenced course. |
 | `POST` | `/api/academic-records` | Create a manual academic record. |
 | `GET` | `/api/academic-records` | List the authenticated student's academic records. |
 | `GET` | `/api/academic-records/:id` | Get one authenticated student's academic record. |
@@ -307,12 +312,36 @@ course-environment logs so that weekly source records align with their check-in.
 `GET /api/check-ins/current` determines the current Monday in `Asia/Manila` and returns
 `completed: false` with `checkIn: null` when the student has not submitted that week.
 
-For a course-environment log, send at least one concern rating or note. `check_in_id` is optional and must reference one of the authenticated student's weekly check-ins.
+Create a course before adding academic records or course-environment logs. Course codes are trimmed, converted to uppercase, and must be unique for each student.
 
 ```json
 {
-  "course_code": "ITISDEV",
-  "course_name": "IT Systems Development",
+  "code": "ITISDEV",
+  "name": "IT Systems Development"
+}
+```
+
+Course lists accept `limit` (1–100, default 25) and `offset` (default 0). A course with linked academic records or environment logs cannot be deleted; the API returns `409 Conflict` so historical data is preserved.
+
+Academic records now reference a course by UUID:
+
+```json
+{
+  "course_id": "COURSE_UUID",
+  "record_type": "assignment",
+  "title": "MCO 1",
+  "due_at": "2026-07-20T23:59:00+08:00",
+  "submission_status": "upcoming",
+  "score": null,
+  "max_score": null
+}
+```
+
+For a course-environment log, send at least one concern rating or note. `course_id` must reference one of the authenticated student's courses; `check_in_id` is optional and must reference one of the authenticated student's weekly check-ins.
+
+```json
+{
+  "course_id": "COURSE_UUID",
   "week_start": "2026-07-06",
   "workload_difficulty": 4,
   "unclear_instruction_level": 2,
@@ -363,8 +392,10 @@ http://localhost:5173
 ```
 
 The frontend sends HTTP requests to the backend REST API while both development servers are running.
-Academic records support student-created manual records and internally seeded mock records. `GET /api/academic-records` accepts `limit` (1-100, default 25), `offset` (default 0), and optional `source` (`manual` or `mock`), `record_type`, `course_code`, `due_from`, and `due_to` filters. Records are returned by due date, with undated records last. Students can create, update, and delete only manual records; mock records are created through the backend's internal `createMockAcademicRecord` service and are read-only to students.
-Course-environment logs accept `limit` (1-100, default 25), `offset` (default 0), and optional `week_start`, `course_code`, and `check_in_id` filters. Results are ordered by newest week, then course code.
+Academic records support student-created manual records and internally seeded mock records. `GET /api/academic-records` accepts `limit` (1-100, default 25), `offset` (default 0), and optional `source` (`manual` or `mock`), `record_type`, `course_id`, `due_from`, and `due_to` filters. Records are returned by due date, with undated records last. Students can create, update, and delete only manual records; mock records are created through the backend's internal `createMockAcademicRecord` service and are read-only to students.
+Course-environment logs accept `limit` (1-100, default 25), `offset` (default 0), and optional `week_start`, `course_id`, and `check_in_id` filters. Results are ordered by newest week, then course ID.
+
+Academic-record and course-environment-log responses include `course_id` and a nested `course` object containing `id`, `code`, and `name`; duplicated top-level course code/name fields are no longer returned. Existing databases should apply `backend/database/003_normalize_courses.sql`. The migration backfills courses transactionally and stops if a student has conflicting course names for the same normalized code.
 
 ## Demo Student Seed
 

@@ -92,8 +92,10 @@ test("database course logs map every calculator input field", () => {
     assert.deepEqual(mapDatabaseRowToCourseEnvironmentInput({
         id: "log-id",
         week_start: "2026-07-13",
-        course_code: "ITISDEV",
-        course_name: "IT Systems Development",
+        course: {
+            code: "ITISDEV",
+            name: "IT Systems Development"
+        },
         workload_difficulty: 5,
         unclear_instruction_level: 3,
         grading_concern_level: 4,
@@ -136,8 +138,12 @@ test("latest-week selection excludes older logs and preserves record order", () 
 
 test("runSeededCourseEnvironment calculates the latest active-database week", async () => {
     const scenario = buildDemoStudentScenario({ studentId, studentNumber, now: fixedNow });
+    const coursesById = new Map(scenario.tables.courses.map((course) => [course.id, course]));
     const { calls, supabase } = createSupabaseMock({
-        courseLogs: scenario.tables.course_environment_logs
+        courseLogs: scenario.tables.course_environment_logs.map((log) => ({
+            ...log,
+            course: coursesById.get(log.course_id)
+        }))
     });
 
     const analysis = await runSeededCourseEnvironment({ supabase, studentNumber });

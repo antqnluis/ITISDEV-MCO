@@ -3,7 +3,7 @@
 -- Revised Supabase Database Schema
 --
 -- WARNING:
--- This script deletes all existing data from the eight listed
+-- This script deletes all existing data from the nine listed
 -- public tables before recreating them.
 --
 -- It does NOT delete auth.users or Supabase system tables.
@@ -22,6 +22,7 @@ drop table if exists public.wellness_dimension_scores cascade;
 drop table if exists public.course_environment_logs cascade;
 drop table if exists public.calendar_events cascade;
 drop table if exists public.academic_records cascade;
+drop table if exists public.courses cascade;
 drop table if exists public.weekly_check_ins cascade;
 drop table if exists public.student_profiles cascade;
 drop table if exists public.students cascade;
@@ -317,7 +318,48 @@ create table public.weekly_check_ins (
 
 
 -- ============================================================
--- 6. ACADEMIC RECORDS
+-- 6. COURSES
+--
+-- Stores the authenticated student's course catalog. Course
+-- identity and display metadata are shared by academic records
+-- and weekly course-environment logs.
+-- ============================================================
+
+create table public.courses (
+    id uuid primary key default gen_random_uuid(),
+
+    student_id uuid not null
+        references public.students(id)
+        on delete cascade,
+
+    code text not null,
+    name text not null,
+
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+
+    constraint courses_id_student_unique
+        unique (id, student_id),
+
+    constraint courses_student_code_unique
+        unique (student_id, code),
+
+    constraint courses_code_valid
+        check (
+            code = upper(btrim(code))
+            and char_length(code) between 1 and 30
+        ),
+
+    constraint courses_name_valid
+        check (
+            name = btrim(name)
+            and char_length(name) between 1 and 150
+        )
+);
+
+
+-- ============================================================
+-- 7. ACADEMIC RECORDS
 --
 -- Stores manually entered or mock academic data.
 --
@@ -340,8 +382,7 @@ create table public.academic_records (
 
     source text not null default 'manual',
 
-    course_code text not null,
-    course_name text not null,
+    course_id uuid not null,
 
     record_type text not null,
     title text not null,
@@ -374,6 +415,11 @@ create table public.academic_records (
     constraint academic_records_id_student_unique
         unique (id, student_id),
 
+    constraint academic_records_course_student_fk
+        foreign key (course_id, student_id)
+        references public.courses(id, student_id)
+        on delete no action,
+
     constraint academic_records_source_valid
         check (
             source in (
@@ -401,16 +447,6 @@ create table public.academic_records (
                 'missed',
                 'not_applicable'
             )
-        ),
-
-    constraint academic_records_course_code_not_blank
-        check (
-            char_length(btrim(course_code)) > 0
-        ),
-
-    constraint academic_records_course_name_not_blank
-        check (
-            char_length(btrim(course_name)) > 0
         ),
 
     constraint academic_records_title_not_blank
@@ -446,7 +482,7 @@ create table public.academic_records (
 
 
 -- ============================================================
--- 7. CALENDAR EVENTS
+-- 8. CALENDAR EVENTS
 --
 -- Stores manually entered or mock academic, personal,
 -- logistical, and role-related commitments.
@@ -570,7 +606,7 @@ create table public.calendar_events (
 
 
 -- ============================================================
--- 8. COURSE ENVIRONMENT LOGS
+-- 9. COURSE ENVIRONMENT LOGS
 --
 -- Stores student-reported concerns for individual courses.
 --
@@ -590,8 +626,7 @@ create table public.course_environment_logs (
 
     check_in_id uuid,
 
-    course_code text not null,
-    course_name text not null,
+    course_id uuid not null,
     week_start date not null,
 
     workload_difficulty smallint,
@@ -610,26 +645,21 @@ create table public.course_environment_logs (
         references public.weekly_check_ins(id, student_id)
         on delete cascade,
 
+    constraint course_environment_course_student_fk
+        foreign key (course_id, student_id)
+        references public.courses(id, student_id)
+        on delete no action,
+
     constraint course_environment_student_course_week_unique
         unique (
             student_id,
-            course_code,
+            course_id,
             week_start
         ),
 
     constraint course_environment_week_start_monday
         check (
             extract(isodow from week_start) = 1
-        ),
-
-    constraint course_environment_course_code_not_blank
-        check (
-            char_length(btrim(course_code)) > 0
-        ),
-
-    constraint course_environment_course_name_not_blank
-        check (
-            char_length(btrim(course_name)) > 0
         ),
 
     constraint course_environment_workload_valid
@@ -681,7 +711,7 @@ create table public.course_environment_logs (
 
 
 -- ============================================================
--- 9. WELLNESS DIMENSION SCORES
+-- 10. WELLNESS DIMENSION SCORES
 --
 -- Stores one set of calculated dimension scores for each
 -- weekly check-in before the values are sent to the AI layer.
@@ -772,7 +802,7 @@ create table public.wellness_dimension_scores (
 
 
 -- ============================================================
--- 10. AI RESULTS
+-- 11. AI RESULTS
 --
 -- Stores one AI-assisted analysis for each weekly check-in.
 --
@@ -917,7 +947,7 @@ create table public.ai_results (
 
 
 -- ============================================================
--- 11. INDEXES
+-- 12. INDEXES
 --
 -- Improves common dashboard and backend queries.
 -- ============================================================
@@ -933,6 +963,12 @@ create index weekly_check_ins_student_date_index
         week_start desc
     );
 
+create index courses_student_code_index
+    on public.courses (
+        student_id,
+        code
+    );
+
 create index academic_records_student_due_index
     on public.academic_records (
         student_id,
@@ -942,7 +978,7 @@ create index academic_records_student_due_index
 create index academic_records_student_course_index
     on public.academic_records (
         student_id,
-        course_code
+        course_id
     );
 
 create index academic_records_student_status_index
@@ -986,6 +1022,12 @@ create index course_environment_check_in_index
         check_in_id
     );
 
+create index course_environment_student_course_index
+    on public.course_environment_logs (
+        student_id,
+        course_id
+    );
+
 create index wellness_dimension_scores_student_calculated_index
     on public.wellness_dimension_scores (
         student_id,
@@ -1000,7 +1042,7 @@ create index ai_results_student_generated_index
 
 
 -- ============================================================
--- 12. AUTOMATIC UPDATED_AT FUNCTION
+-- 13. AUTOMATIC UPDATED_AT FUNCTION
 --
 -- Sets updated_at to the current timestamp whenever a record
 -- is updated.
@@ -1019,7 +1061,7 @@ $$;
 
 
 -- ============================================================
--- 13. UPDATED_AT TRIGGERS
+-- 14. UPDATED_AT TRIGGERS
 -- ============================================================
 
 create trigger students_set_updated_at
@@ -1034,6 +1076,11 @@ execute function public.set_updated_at();
 
 create trigger weekly_check_ins_set_updated_at
 before update on public.weekly_check_ins
+for each row
+execute function public.set_updated_at();
+
+create trigger courses_set_updated_at
+before update on public.courses
 for each row
 execute function public.set_updated_at();
 
@@ -1064,7 +1111,7 @@ execute function public.set_updated_at();
 
 
 -- ============================================================
--- 14. ENABLE ROW-LEVEL SECURITY
+-- 15. ENABLE ROW-LEVEL SECURITY
 -- ============================================================
 
 alter table public.students
@@ -1074,6 +1121,9 @@ alter table public.student_profiles
 enable row level security;
 
 alter table public.weekly_check_ins
+enable row level security;
+
+alter table public.courses
 enable row level security;
 
 alter table public.academic_records
@@ -1093,7 +1143,7 @@ enable row level security;
 
 
 -- ============================================================
--- 15. STUDENT RLS POLICIES
+-- 16. STUDENT RLS POLICIES
 --
 -- An authenticated student can create, view, and update their
 -- own public student record.
@@ -1131,7 +1181,7 @@ with check (
 
 
 -- ============================================================
--- 16. STUDENT PROFILE RLS POLICIES
+-- 17. STUDENT PROFILE RLS POLICIES
 -- ============================================================
 
 create policy "Students can view their own profile"
@@ -1171,7 +1221,7 @@ using (
 
 
 -- ============================================================
--- 17. WEEKLY CHECK-IN RLS POLICIES
+-- 18. WEEKLY CHECK-IN RLS POLICIES
 -- ============================================================
 
 create policy "Students can view their own check-ins"
@@ -1211,7 +1261,47 @@ using (
 
 
 -- ============================================================
--- 18. ACADEMIC RECORD RLS POLICIES
+-- 19. COURSE RLS POLICIES
+-- ============================================================
+
+create policy "Students can view their own courses"
+on public.courses
+for select
+to authenticated
+using (
+    (select auth.uid()) = student_id
+);
+
+create policy "Students can create their own courses"
+on public.courses
+for insert
+to authenticated
+with check (
+    (select auth.uid()) = student_id
+);
+
+create policy "Students can update their own courses"
+on public.courses
+for update
+to authenticated
+using (
+    (select auth.uid()) = student_id
+)
+with check (
+    (select auth.uid()) = student_id
+);
+
+create policy "Students can delete their own courses"
+on public.courses
+for delete
+to authenticated
+using (
+    (select auth.uid()) = student_id
+);
+
+
+-- ============================================================
+-- 20. ACADEMIC RECORD RLS POLICIES
 --
 -- Students can create, view, update, and delete academic
 -- records belonging to their own authenticated account.
@@ -1258,7 +1348,7 @@ using (
 
 
 -- ============================================================
--- 19. CALENDAR EVENT RLS POLICIES
+-- 21. CALENDAR EVENT RLS POLICIES
 -- ============================================================
 
 create policy "Students can view their own calendar events"
@@ -1298,7 +1388,7 @@ using (
 
 
 -- ============================================================
--- 20. COURSE ENVIRONMENT RLS POLICIES
+-- 22. COURSE ENVIRONMENT RLS POLICIES
 -- ============================================================
 
 create policy "Students can view their own course logs"
@@ -1338,7 +1428,7 @@ using (
 
 
 -- ============================================================
--- 21. WELLNESS DIMENSION SCORE RLS POLICY
+-- 23. WELLNESS DIMENSION SCORE RLS POLICY
 --
 -- Students can read their own calculated dimension scores.
 --
@@ -1356,7 +1446,7 @@ using (
 
 
 -- ============================================================
--- 22. AI RESULT RLS POLICY
+-- 24. AI RESULT RLS POLICY
 --
 -- Students can read their own AI-generated results.
 --
@@ -1374,7 +1464,7 @@ using (
 
 
 -- ============================================================
--- 23. DATABASE PERMISSIONS
+-- 25. DATABASE PERMISSIONS
 -- ============================================================
 
 grant usage on schema public
@@ -1390,6 +1480,10 @@ to authenticated;
 
 grant select, insert, update, delete
 on public.weekly_check_ins
+to authenticated;
+
+grant select, insert, update, delete
+on public.courses
 to authenticated;
 
 grant select, insert, update, delete
@@ -1419,6 +1513,7 @@ grant all
 on public.students,
    public.student_profiles,
    public.weekly_check_ins,
+   public.courses,
    public.academic_records,
    public.calendar_events,
    public.course_environment_logs,

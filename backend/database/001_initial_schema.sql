@@ -61,10 +61,21 @@ CREATE TABLE public.weekly_check_ins (
   CONSTRAINT weekly_check_ins_pkey PRIMARY KEY (id),
   CONSTRAINT weekly_check_ins_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
+CREATE TABLE public.courses (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  code text NOT NULL CHECK (code = upper(btrim(code)) AND char_length(code) >= 1 AND char_length(code) <= 30),
+  name text NOT NULL CHECK (name = btrim(name) AND char_length(name) >= 1 AND char_length(name) <= 150),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT courses_pkey PRIMARY KEY (id),
+  CONSTRAINT courses_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT courses_student_code_unique UNIQUE (student_id, code),
+  CONSTRAINT courses_id_student_unique UNIQUE (id, student_id)
+);
 CREATE TABLE public.academic_records (
   student_id uuid NOT NULL,
-  course_code text NOT NULL CHECK (char_length(btrim(course_code)) > 0),
-  course_name text NOT NULL CHECK (char_length(btrim(course_name)) > 0),
+  course_id uuid NOT NULL,
   record_type text NOT NULL CHECK (record_type = ANY (ARRAY['assignment'::text, 'assessment'::text, 'grade_snapshot'::text, 'engagement_snapshot'::text])),
   title text NOT NULL CHECK (char_length(btrim(title)) > 0),
   due_at timestamp with time zone,
@@ -83,7 +94,8 @@ END,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT academic_records_pkey PRIMARY KEY (id),
-  CONSTRAINT academic_records_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
+  CONSTRAINT academic_records_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT academic_records_course_student_fk FOREIGN KEY (course_id, student_id) REFERENCES public.courses(id, student_id)
 );
 CREATE TABLE public.calendar_events (
   student_id uuid NOT NULL,
@@ -109,8 +121,7 @@ CREATE TABLE public.calendar_events (
 CREATE TABLE public.course_environment_logs (
   student_id uuid NOT NULL,
   check_in_id uuid,
-  course_code text NOT NULL CHECK (char_length(btrim(course_code)) > 0),
-  course_name text NOT NULL CHECK (char_length(btrim(course_name)) > 0),
+  course_id uuid NOT NULL,
   week_start date NOT NULL,
   workload_difficulty smallint CHECK (workload_difficulty IS NULL OR workload_difficulty >= 1 AND workload_difficulty <= 5),
   unclear_instruction_level smallint CHECK (unclear_instruction_level IS NULL OR unclear_instruction_level >= 1 AND unclear_instruction_level <= 5),
@@ -124,6 +135,7 @@ CREATE TABLE public.course_environment_logs (
   CONSTRAINT course_environment_week_start_monday CHECK (EXTRACT(isodow FROM week_start) = 1),
   CONSTRAINT course_environment_logs_pkey PRIMARY KEY (id),
   CONSTRAINT course_environment_logs_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT course_environment_course_student_fk FOREIGN KEY (course_id, student_id) REFERENCES public.courses(id, student_id),
   CONSTRAINT course_environment_check_in_student_fk FOREIGN KEY (check_in_id) REFERENCES public.weekly_check_ins(id),
   CONSTRAINT course_environment_check_in_student_fk FOREIGN KEY (student_id) REFERENCES public.weekly_check_ins(student_id)
 );

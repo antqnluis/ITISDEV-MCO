@@ -2,8 +2,8 @@ const ACADEMIC_RECORD_SELECT = [
     "id",
     "student_id",
     "source",
-    "course_code",
-    "course_name",
+    "course_id",
+    "course:courses!academic_records_course_student_fk(id, code, name)",
     "record_type",
     "title",
     "due_at",
@@ -32,8 +32,7 @@ const SUBMISSION_STATUSES = new Set([
     "not_applicable"
 ]);
 const EDITABLE_FIELDS = new Set([
-    "course_code",
-    "course_name",
+    "course_id",
     "record_type",
     "title",
     "due_at",
@@ -171,7 +170,7 @@ function normalizeRecordInput(payload, { isCreate = false, allowRecordedAt = fal
     }
 
     if (isCreate) {
-        for (const field of ["course_code", "course_name", "record_type", "title"]) {
+        for (const field of ["course_id", "record_type", "title"]) {
             if (!hasOwn(payload, field)) {
                 throw createServiceError(`${field} is required`);
             }
@@ -180,7 +179,11 @@ function normalizeRecordInput(payload, { isCreate = false, allowRecordedAt = fal
 
     const record = {};
     for (const [field, value] of Object.entries(payload)) {
-        if (field === "course_code" || field === "course_name" || field === "title") {
+        if (field === "course_id") {
+            record[field] = normalizeUuid(value, field);
+            continue;
+        }
+        if (field === "title") {
             record[field] = normalizeRequiredText(value, field);
             continue;
         }
@@ -218,7 +221,7 @@ function normalizeListOptions(query = {}) {
         "offset",
         "source",
         "record_type",
-        "course_code",
+        "course_id",
         "due_from",
         "due_to"
     ]);
@@ -241,9 +244,9 @@ function normalizeListOptions(query = {}) {
         recordType: query.record_type === undefined
             ? null
             : normalizeEnum(query.record_type, "record_type", RECORD_TYPES),
-        courseCode: query.course_code === undefined
+        courseId: query.course_id === undefined
             ? null
-            : normalizeRequiredText(query.course_code, "course_code"),
+            : normalizeUuid(query.course_id, "course_id"),
         dueFrom,
         dueTo
     };
@@ -251,6 +254,22 @@ function normalizeListOptions(query = {}) {
 
 function throwDatabaseError(error, operation) {
     throw createServiceError(`Unable to ${operation} the academic record`, 500);
+}
+
+async function assertCourseBelongsToStudent(supabase, studentId, courseId) {
+    const { data, error } = await supabase
+        .from("courses")
+        .select("id")
+        .eq("id", courseId)
+        .eq("student_id", studentId)
+        .maybeSingle();
+
+    if (error) {
+        throw createServiceError("Unable to verify the course", 500);
+    }
+    if (!data) {
+        throw createServiceError("Course not found", 404);
+    }
 }
 
 async function listAcademicRecords(supabase, studentId, query) {
@@ -266,8 +285,8 @@ async function listAcademicRecords(supabase, studentId, query) {
     if (options.recordType) {
         request = request.eq("record_type", options.recordType);
     }
-    if (options.courseCode) {
-        request = request.eq("course_code", options.courseCode);
+    if (options.courseId) {
+        request = request.eq("course_id", options.courseId);
     }
     if (options.dueFrom) {
         request = request.gte("due_at", `${options.dueFrom}T00:00:00.000Z`);
@@ -328,6 +347,7 @@ async function getEditableManualAcademicRecord(supabase, studentId, recordId) {
 async function createAcademicRecord(supabase, studentId, payload) {
     const record = normalizeRecordInput(payload, { isCreate: true });
     assertScorePair(record);
+    await assertCourseBelongsToStudent(supabase, studentId, record.course_id);
 
     const { data, error } = await supabase
         .from("academic_records")
@@ -346,6 +366,9 @@ async function updateAcademicRecord(supabase, studentId, recordId, payload) {
     const changes = normalizeRecordInput(payload);
     const currentRecord = await getEditableManualAcademicRecord(supabase, studentId, recordId);
     assertScorePair({ ...currentRecord, ...changes });
+    if (hasOwn(changes, "course_id") && changes.course_id !== currentRecord.course_id) {
+        await assertCourseBelongsToStudent(supabase, studentId, changes.course_id);
+    }
 
     const { data, error } = await supabase
         .from("academic_records")
@@ -403,10 +426,12 @@ async function createMockAcademicRecord(payload, serviceClient = getServiceSupab
     const { student_id: studentId, ...recordPayload } = payload;
     const record = normalizeRecordInput(recordPayload, { isCreate: true, allowRecordedAt: true });
     assertScorePair(record);
+    const normalizedStudentId = normalizeUuid(studentId, "student_id");
+    await assertCourseBelongsToStudent(serviceClient, normalizedStudentId, record.course_id);
 
     const { data, error } = await serviceClient
         .from("academic_records")
-        .insert({ ...record, student_id: normalizeUuid(studentId, "student_id"), source: "mock" })
+        .insert({ ...record, student_id: normalizedStudentId, source: "mock" })
         .select(ACADEMIC_RECORD_SELECT)
         .single();
 
