@@ -94,6 +94,22 @@ export function PrototypeDataProvider({ children }) {
             setStudent(nextStudent);
             setProfile(nextProfile);
         },
+        // This mirrors the data an eventual export endpoint will provide.
+        exportWellnessSummary() {
+            return {
+                generated_at: new Date().toISOString(),
+                student: {
+                    first_name: student.first_name,
+                    last_name: student.last_name,
+                    student_number: student.student_number,
+                    email: student.email,
+                },
+                profile: { ...profile, wellness_goals: [...profile.wellness_goals] },
+                check_ins: checkIns.map((checkIn) => ({ ...checkIn })),
+                dimension_scores: dimensionScores.map((score) => ({ ...score })),
+                course_logs: courseLogs.map((log) => ({ ...log })),
+            };
+        },
     }), [student, profile, checkIns, dimensionScores, courses, academicRecords, calendarEvents, courseLogs]);
 
     return <PrototypeDataContext.Provider value={value}>{children}</PrototypeDataContext.Provider>;
