@@ -10,8 +10,10 @@ import Register from "../pages/Register";
 import Consent from "../pages/Consent";
 import Dashboard from "../pages/Dashboard";
 import Onboarding from "../pages/Onboarding";
+import Calendar from "../pages/Calendar";
 import WeeklyCheckIn from "../pages/WeeklyCheckIn";
 import AcademicRecords from "../pages/AcademicRecords";
+import Settings from "../pages/Settings";
 
 function AppRouter() {
     return (
@@ -26,8 +28,10 @@ function AppRouter() {
                     </RequireAuth>
                 )} />
                 <Route path="/dashboard" element={<RequireAuth requireConsent><Dashboard /></RequireAuth>} />
+                <Route path="/calendar" element={<RequireAuth requireConsent><Calendar /></RequireAuth>} />
                 <Route path="/check-in" element={<RequireAuth requireConsent><WeeklyCheckIn /></RequireAuth>} />
                 <Route path="/academic-records" element={<RequireAuth requireConsent><AcademicRecords /></RequireAuth>} />
+                <Route path="/settings" element={<RequireAuth requireConsent><Settings /></RequireAuth>} />
             </Routes>
         </BrowserRouter>
     );

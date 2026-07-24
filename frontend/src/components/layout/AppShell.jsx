@@ -9,7 +9,6 @@ const links = [
     { to: "/calendar", label: "Calendar", icon: "calendar" },
     { to: "/check-in", label: "Weekly Check-in", icon: "check" },
     { to: "/academic-records", label: "Academic Records", icon: "records" },
-    { to: "/settings", label: "Settings", icon: "settings" },
 ];
 
 function navClass({ isActive }) {
@@ -61,7 +60,7 @@ function AppShell({ children }) {
                                     <p className="mt-0.5 truncate text-xs text-[#73817c]">{user?.email}</p>
                                 </div>
                                 <button type="button" onClick={() => { setUserMenuOpen(false); navigate("/settings"); }} className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[#546861] hover:bg-[#f2f6f2]">
-                                    <AppIcon name="settings" className="size-4" /> Account settings
+                                    <AppIcon name="settings" className="size-4" /> Settings
                                 </button>
                                 <button type="button" onClick={signOut} disabled={isSigningOut} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[#a24c45] hover:bg-[#fff1ef] disabled:cursor-wait disabled:opacity-60">
                                     <AppIcon name="logout" className="size-4" /> {isSigningOut ? "Signing out…" : "Sign out"}
