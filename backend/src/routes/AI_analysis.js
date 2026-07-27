@@ -1,17 +1,55 @@
-import { Router } from 'express';
-import { supabase } from '../supabaseClient.js';
-import { OpenAI } from 'openai';
+const express = require("express");
 
-const router = Router();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const router = express.Router();
 
+function createUnavailableError() {
+  const error = new Error("AI analysis is currently unavailable");
+  error.statusCode = 503;
+  return error;
+}
 
-router.post('/check-ins/analyze', async (req, res) => {
+function loadOpenAIClient(loadModule = require) {
+  if (!process.env.OPENAI_API_KEY) {
+    throw createUnavailableError();
+  }
+
+  let OpenAI;
+
   try {
+    ({ OpenAI } = loadModule("openai"));
+  } catch (error) {
+    if (error.code === "MODULE_NOT_FOUND") {
+      throw createUnavailableError();
+    }
+
+    throw error;
+  }
+
+  if (typeof OpenAI !== "function") {
+    throw createUnavailableError();
+  }
+
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
+
+function loadServiceSupabase(loadModule = require) {
+  const { serviceSupabase } = loadModule("../config/supabaseClient");
+
+  if (!serviceSupabase) {
+    throw createUnavailableError();
+  }
+
+  return serviceSupabase;
+}
+
+async function analyzeCheckIn(req, res) {
+  try {
+    const openai = loadOpenAIClient();
+    const supabase = loadServiceSupabase();
     const { student_id, check_in_id, dimension_scores_id } = req.body;
 
     // RETRIEVAL
-    
+
     // Fetch the student's new text reflection
     const { data: checkIn } = await supabase
       .from('weekly_check_ins')
@@ -47,13 +85,14 @@ router.post('/check-ins/analyze', async (req, res) => {
       }
     }
 
-    
+
     // AUGMENTATION
 
-   const systemPrompt = `You are a private personal informatics wellness analyzer for a De La Salle University (DLSU) student. 
+   const systemPrompt = `You are a private personal informatics wellness analyzer for a De La Salle University (DLSU) student.
     Analyze the student's quantitative metrics and qualitative text reflection to generate a weekly summary, high-frequency keywords, and specific actionable recommendations.
 
     STUDENT METRICS FOR THIS WEEK:
+    All five metrics are risk or concern scores. A score of 0 means low concern, while a score of 100 means high concern. Higher scores always indicate greater concern.
     - Academic Engagement Score: ${scores.academic_engagement_score}/100
     - Personal Wellbeing Score: ${scores.personal_wellbeing_score}/100
     - Logistical Load Score: ${scores.logistical_load_score}/100
@@ -65,7 +104,8 @@ router.post('/check-ins/analyze', async (req, res) => {
 
     RECOMMENDATION INSTRUCTIONS:
     - Synthesize the metrics and the student's text reflection.
-    - If a specific stress context dominates (e.g., low Course Environment score or mentions of groupmate issues), tailor the recommendations to address that dimension using the Approved Campus Support Documentation.
+    - Treat the dimension with the highest concern score as the primary stress context. If every dimension score is above 75, use "mixed" because concern is broadly high across all dimensions.
+    - If a specific stress context dominates (e.g., a high Course Environment score or mentions of groupmate issues), tailor the recommendations to address that dimension using the Approved Campus Support Documentation.
     - Keep recommendations actionable, practical, and highly specific (mentioning exact offices, emails, or Zoom details if provided in the context).
 
     CRITICAL SAFETY & ESCALATION RULE:
@@ -86,7 +126,7 @@ router.post('/check-ins/analyze', async (req, res) => {
       "recommendations": ["Array of short, actionable time-management or campus support text strings"]
     }`;
 
-    
+
     // PHASE 3: GENERATION
 
     const completion = await openai.chat.completions.create({
@@ -124,9 +164,21 @@ router.post('/check-ins/analyze', async (req, res) => {
     return res.status(200).json({ success: true, message: "Analysis complete and saved." });
 
   } catch (error) {
-    console.error("Pipeline failure:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-});
+    if (!error.statusCode) {
+      console.error("Pipeline failure:", error);
+    }
 
-export default router;
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode
+        ? error.message
+        : "AI analysis failed"
+    });
+  }
+}
+
+router.post("/check-ins/analyze", analyzeCheckIn);
+
+module.exports = router;
+module.exports.analyzeCheckIn = analyzeCheckIn;
+module.exports.loadOpenAIClient = loadOpenAIClient;

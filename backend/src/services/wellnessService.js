@@ -1,6 +1,14 @@
-import { supabase } from '../config/supabase.js';
+const { serviceSupabase } = require("../config/supabaseClient");
+const { selectPrimaryStressContext } = require("../utils/wellnessRisk");
 
-export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimension_scores_id }) => {
+async function runMockWellnessPipeline({ student_id, check_in_id, dimension_scores_id }) {
+  if (!serviceSupabase) {
+    const error = new Error("SUPABASE_SERVICE_ROLE_KEY is required for wellness analysis");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const supabase = serviceSupabase;
   
   // FETCH RAW DATA FROM SUPABASE
   const { data: checkIn, error: checkInErr } = await supabase
@@ -20,8 +28,8 @@ export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimensi
   }
 
   // DETERMINISTIC LOGIC (Find Primary Stress Context)
-  // Map scores into an array to locate the lowest (worst performing) dimension
-  const dimensions = [
+  // Dimension scores represent concern: 0 is low concern and 100 is high concern.
+  const dimensionScores = [
     { name: 'academic_engagement', score: Number(scores.academic_engagement_score) },
     { name: 'personal_wellbeing', score: Number(scores.personal_wellbeing_score) },
     { name: 'logistical_load', score: Number(scores.logistical_load_score) },
@@ -29,14 +37,9 @@ export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimensi
     { name: 'course_environment', score: Number(scores.course_environment_score) }
   ];
 
-  // Sort ascending so the lowest score comes first
-  dimensions.sort((a, b) => a.score - b.score);
-  let primaryContext = dimensions[0].name;
-  
-  // If the lowest score is still relatively healthy, mark as mixed
-  if (dimensions[0].score > 75) {
-    primaryContext = 'mixed';
-  }
+  const contextSelection = selectPrimaryStressContext(dimensionScores);
+  const dimensions = contextSelection.orderedDimensions;
+  let primaryContext = contextSelection.primaryContext;
 
   // MOCK RETRIEVAL (SQL Category Filtering instead of Vectors)
   const { data: resources } = await supabase
@@ -95,7 +98,6 @@ export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimensi
   // Calculated compound Student Wellness Index (SWI) score out of 100
   const calculatedSwi = Math.round(dimensions.reduce((sum, d) => sum + d.score, 0) / dimensions.length);
 
-  /
   // SAVE FINAL DATA OBJECT TO DB
   const { data: insertedResult, error: dbError } = await supabase
     .from('ai_results')
@@ -119,4 +121,8 @@ export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimensi
   if (dbError) throw dbError;
 
   return insertedResult;
+}
+
+module.exports = {
+  runMockWellnessPipeline
 };
