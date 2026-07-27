@@ -4,12 +4,15 @@ import CourseForm from "../components/academic-records/CourseForm";
 import CourseSection from "../components/academic-records/CourseSection";
 import AppShell from "../components/layout/AppShell";
 import AppIcon from "../components/ui/AppIcon";
+import Button from "../components/ui/Button";
 import DashboardPageHeader from "../components/ui/DashboardPageHeader";
 import Modal from "../components/ui/Modal";
 import { useAuth } from "../context/useAuth";
 import {
     createAcademicRecord,
+    deleteAcademicRecord,
     listAllAcademicRecords,
+    updateAcademicRecord,
 } from "../services/academicRecordApi";
 import { createCourse, listAllCourses } from "../services/courseApi";
 
@@ -42,6 +45,12 @@ function AcademicRecords() {
     const [recordCourse, setRecordCourse] = useState(null);
     const [recordSubmitting, setRecordSubmitting] = useState(false);
     const [recordSubmissionError, setRecordSubmissionError] = useState("");
+    const [editingRecord, setEditingRecord] = useState(null);
+    const [editSubmitting, setEditSubmitting] = useState(false);
+    const [editSubmissionError, setEditSubmissionError] = useState("");
+    const [deletingRecord, setDeletingRecord] = useState(null);
+    const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+    const [deleteSubmissionError, setDeleteSubmissionError] = useState("");
 
     useEffect(() => {
         let cancelled = false;
@@ -102,6 +111,44 @@ function AcademicRecords() {
         }
     }
 
+    async function saveEditedRecord(payload) {
+        if (!editingRecord) return;
+        setEditSubmitting(true);
+        setEditSubmissionError("");
+        try {
+            const record = await updateAcademicRecord(
+                authenticatedRequest,
+                editingRecord.id,
+                payload,
+            );
+            setAcademicRecords((current) => sortRecords(
+                current.map((item) => item.id === record.id ? record : item),
+            ));
+            setEditingRecord(null);
+        } catch (error) {
+            setEditSubmissionError(error.message || "Unable to update the academic record.");
+        } finally {
+            setEditSubmitting(false);
+        }
+    }
+
+    async function confirmDeleteRecord() {
+        if (!deletingRecord) return;
+        setDeleteSubmitting(true);
+        setDeleteSubmissionError("");
+        try {
+            await deleteAcademicRecord(authenticatedRequest, deletingRecord.id);
+            setAcademicRecords((current) => (
+                current.filter((record) => record.id !== deletingRecord.id)
+            ));
+            setDeletingRecord(null);
+        } catch (error) {
+            setDeleteSubmissionError(error.message || "Unable to delete the academic record.");
+        } finally {
+            setDeleteSubmitting(false);
+        }
+    }
+
     function openCourseModal() {
         setCourseSubmissionError("");
         setCourseModalOpen(true);
@@ -112,8 +159,28 @@ function AcademicRecords() {
         setRecordCourse(course);
     }
 
+    function openEditModal(record) {
+        setEditSubmissionError("");
+        setEditingRecord(record);
+    }
+
+    function openDeleteModal(record) {
+        setDeleteSubmissionError("");
+        setDeletingRecord(record);
+    }
+
+    function closeDeleteModal() {
+        if (deleteSubmitting) return;
+        setDeletingRecord(null);
+        setDeleteSubmissionError("");
+    }
+
     const recordsForCourse = (course) => academicRecords
         .filter((record) => record.course_id === course.id);
+    const editingCourse = editingRecord
+        ? courses.find((course) => course.id === editingRecord.course_id)
+            || editingRecord.course
+        : null;
 
     const addCourseButton = (
         <button type="button" onClick={openCourseModal} className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#3f7854] px-4 text-sm font-semibold text-white shadow-[0_5px_14px_rgba(37,89,58,0.2)] transition hover:bg-[#356c49] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4b8360]">
@@ -154,7 +221,16 @@ function AcademicRecords() {
                 </section>
             ) : (
                 <div className="space-y-6">
-                    {courses.map((course) => <CourseSection key={course.id} course={course} records={recordsForCourse(course)} onAddRecord={openRecordModal} />)}
+                    {courses.map((course) => (
+                        <CourseSection
+                            key={course.id}
+                            course={course}
+                            records={recordsForCourse(course)}
+                            onAddRecord={openRecordModal}
+                            onEditRecord={openEditModal}
+                            onDeleteRecord={openDeleteModal}
+                        />
+                    ))}
                 </div>
             )}
 
@@ -176,6 +252,56 @@ function AcademicRecords() {
                         isSubmitting={recordSubmitting}
                         submissionError={recordSubmissionError}
                     />
+                )}
+            </Modal>
+
+            <Modal
+                open={Boolean(editingRecord)}
+                onClose={() => setEditingRecord(null)}
+                closeDisabled={editSubmitting}
+                title="Edit academic record"
+                description="Update this record while keeping it under its current course."
+                size="max-w-2xl"
+            >
+                {editingRecord && editingCourse && (
+                    <AcademicRecordForm
+                        key={editingRecord.id}
+                        course={editingCourse}
+                        record={editingRecord}
+                        onSave={saveEditedRecord}
+                        onCancel={() => setEditingRecord(null)}
+                        isSubmitting={editSubmitting}
+                        submissionError={editSubmissionError}
+                    />
+                )}
+            </Modal>
+
+            <Modal
+                open={Boolean(deletingRecord)}
+                onClose={closeDeleteModal}
+                closeDisabled={deleteSubmitting}
+                title="Delete academic record?"
+                description="This action cannot be undone."
+                size="max-w-lg"
+            >
+                {deletingRecord && (
+                    <div>
+                        <div className="rounded-xl border border-[#ead7d3] bg-[#fff7f5] p-4">
+                            <p className="text-sm text-[#7f5c56]">You are about to delete:</p>
+                            <p className="mt-1 font-semibold text-[#713e39]">{deletingRecord.title}</p>
+                        </div>
+                        {deleteSubmissionError && (
+                            <div role="alert" className="mt-4 rounded-xl border border-danger/25 bg-[#fff3f1] px-4 py-3 text-sm font-medium text-danger">
+                                {deleteSubmissionError}
+                            </div>
+                        )}
+                        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                            <Button type="button" variant="secondary" size="compact" fullWidth={false} onClick={closeDeleteModal} disabled={deleteSubmitting}>Cancel</Button>
+                            <Button type="button" size="compact" fullWidth={false} onClick={confirmDeleteRecord} disabled={deleteSubmitting} className="bg-[#a84f47] hover:bg-[#91453e] disabled:bg-[#dcc4c0]">
+                                {deleteSubmitting ? "Deleting…" : "Delete record"}
+                            </Button>
+                        </div>
+                    </div>
                 )}
             </Modal>
         </AppShell>

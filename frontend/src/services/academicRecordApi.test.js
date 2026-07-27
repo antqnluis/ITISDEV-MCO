@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createAcademicRecord,
+  deleteAcademicRecord,
   listAllAcademicRecords,
+  updateAcademicRecord,
 } from "./academicRecordApi";
 
 describe("academic-record API", () => {
@@ -37,6 +39,36 @@ describe("academic-record API", () => {
     expect(request).toHaveBeenCalledWith("/api/academic-records", {
       method: "POST",
       body: payload,
+    });
+  });
+
+  it("updates and deletes an academic record", async () => {
+    const updatedRecord = {
+      id: "record-1",
+      course_id: "course-1",
+      title: "Updated record",
+    };
+    const payload = { title: "Updated record" };
+    const request = vi.fn()
+      .mockResolvedValueOnce({
+        success: true,
+        academicRecord: updatedRecord,
+      })
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      updateAcademicRecord(request, "record-1", payload),
+    ).resolves.toEqual(updatedRecord);
+    await expect(
+      deleteAcademicRecord(request, "record-1"),
+    ).resolves.toBeNull();
+
+    expect(request).toHaveBeenNthCalledWith(1, "/api/academic-records/record-1", {
+      method: "PATCH",
+      body: payload,
+    });
+    expect(request).toHaveBeenNthCalledWith(2, "/api/academic-records/record-1", {
+      method: "DELETE",
     });
   });
 });

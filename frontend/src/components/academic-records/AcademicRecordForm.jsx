@@ -18,24 +18,46 @@ const submissionStatuses = [
     { value: "not_applicable", label: "Not applicable" },
 ];
 
+function toManilaDateInput(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    const parts = Object.fromEntries(
+        new Intl.DateTimeFormat("en-US", {
+            timeZone: "Asia/Manila",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+        }).formatToParts(date).map((part) => [part.type, part.value]),
+    );
+    return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function createInitialForm(record) {
+    return {
+        record_type: record?.record_type || "assignment",
+        title: record?.title || "",
+        due_date: toManilaDateInput(record?.due_at),
+        submission_status: record?.submission_status || "upcoming",
+        score: record?.score ?? "",
+        max_score: record?.max_score ?? "",
+        estimated_workload: "moderate",
+        estimated_hours: "",
+    };
+}
+
 function AcademicRecordForm({
     course,
     isSubmitting = false,
     onCancel,
     onSave,
+    record = null,
     submissionError = "",
 }) {
-    const [form, setForm] = useState({
-        record_type: "assignment",
-        title: "",
-        due_date: "",
-        submission_status: "upcoming",
-        score: "",
-        max_score: "",
-        estimated_workload: "moderate",
-        estimated_hours: "",
-    });
+    const [form, setForm] = useState(() => createInitialForm(record));
     const [scoreError, setScoreError] = useState("");
+    const isEditing = Boolean(record);
 
     function update(event) {
         setScoreError("");
@@ -56,17 +78,18 @@ function AcademicRecordForm({
             return;
         }
 
-        onSave({
-            course_id: course.id,
+        const payload = {
             record_type: form.record_type,
             title: form.title.trim(),
             due_at: form.due_date
-                ? new Date(`${form.due_date}T23:59:00`).toISOString()
+                ? new Date(`${form.due_date}T23:59:00+08:00`).toISOString()
                 : null,
             submission_status: form.submission_status,
             score,
             max_score: maxScore,
-        });
+        };
+        if (!isEditing) payload.course_id = course.id;
+        onSave(payload);
     }
 
     return (
@@ -77,7 +100,7 @@ function AcademicRecordForm({
                 </div>
             )}
             <div className="rounded-xl bg-[#eef5ef] px-4 py-3">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#63806f]">Adding record to</p>
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#63806f]">{isEditing ? "Editing record in" : "Adding record to"}</p>
                 <p className="mt-1 text-sm font-semibold text-[#285b3d]">{course.code} <span className="font-normal text-[#5e7469]">· {course.name}</span></p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -110,7 +133,11 @@ function AcademicRecordForm({
             </section>
             <div className="flex flex-col-reverse gap-3 border-t border-[#e5ebe6] pt-5 sm:flex-row sm:justify-end">
                 <Button type="button" variant="secondary" size="compact" fullWidth={false} onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
-                <Button type="submit" size="compact" fullWidth={false} disabled={isSubmitting}>{isSubmitting ? "Adding…" : "Add record"}</Button>
+                <Button type="submit" size="compact" fullWidth={false} disabled={isSubmitting}>
+                    {isSubmitting
+                        ? (isEditing ? "Saving…" : "Adding…")
+                        : (isEditing ? "Save changes" : "Add record")}
+                </Button>
             </div>
         </form>
     );

@@ -1,3 +1,4 @@
+import AppIcon from "../ui/AppIcon";
 import StatusBadge from "../ui/StatusBadge";
 
 function formatDueDate(value) {
@@ -15,7 +16,7 @@ function formatType(value) {
     return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function AcademicRecordCard({ record }) {
+function AcademicRecordCard({ onDelete, onEdit, record }) {
     const score = record.score !== null && record.score !== undefined
         ? `${record.score} / ${record.max_score}`
         : "Not graded";
@@ -36,7 +37,19 @@ function AcademicRecordCard({ record }) {
                     </div>
                     <h3 className="mt-1 text-base font-semibold text-[#27483a]">{record.title}</h3>
                 </div>
-                <StatusBadge value={record.submission_status} label={formatType(record.submission_status)} />
+                <div className="flex items-center gap-2">
+                    <StatusBadge value={record.submission_status} label={formatType(record.submission_status)} />
+                    {record.source === "manual" && (
+                        <>
+                            <button type="button" onClick={() => onEdit(record)} aria-label={`Edit ${record.title}`} className="grid size-9 place-items-center rounded-lg border border-[#d4dfd6] text-[#47775a] transition hover:border-[#9db9a2] hover:bg-[#edf5ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4b8360]">
+                                <AppIcon name="edit" className="size-4" />
+                            </button>
+                            <button type="button" onClick={() => onDelete(record)} aria-label={`Delete ${record.title}`} className="grid size-9 place-items-center rounded-lg border border-[#ead2ce] text-[#a05249] transition hover:border-[#d8aaa3] hover:bg-[#fff1ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a05249]">
+                                <AppIcon name="trash" className="size-4" />
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
             <div className="mt-4 grid gap-2 text-xs leading-5 text-[#6b7e75] sm:grid-cols-3">
                 <p><span className="font-semibold text-[#526b5f]">Due:</span> {formatDueDate(record.due_at)}</p>

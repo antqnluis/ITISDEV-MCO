@@ -25,3 +25,17 @@ export async function createAcademicRecord(authenticatedRequest, payload) {
   });
   return response.academicRecord;
 }
+
+export async function updateAcademicRecord(authenticatedRequest, id, payload) {
+  const response = await authenticatedRequest(`/api/academic-records/${id}`, {
+    method: "PATCH",
+    body: payload,
+  });
+  return response.academicRecord;
+}
+
+export function deleteAcademicRecord(authenticatedRequest, id) {
+  return authenticatedRequest(`/api/academic-records/${id}`, {
+    method: "DELETE",
+  });
+}

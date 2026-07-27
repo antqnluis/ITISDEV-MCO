@@ -1,7 +1,13 @@
 import AppIcon from "../ui/AppIcon";
 import AcademicRecordCard from "./AcademicRecordCard";
 
-function CourseSection({ course, records, onAddRecord }) {
+function CourseSection({
+    course,
+    records,
+    onAddRecord,
+    onDeleteRecord,
+    onEditRecord,
+}) {
     return (
         <section className="rounded-[20px] border border-[#e0e7e2] bg-white p-5 shadow-[0_5px_20px_rgba(22,51,40,0.035)] sm:p-6">
             <div className="flex flex-col gap-4 border-b border-[#e8ede9] pb-5 sm:flex-row sm:items-start sm:justify-between">
@@ -16,7 +22,14 @@ function CourseSection({ course, records, onAddRecord }) {
             <div className="mt-5">
                 <p className="text-xs font-bold uppercase tracking-[0.13em] text-[#789087]">Academic records</p>
                 <div className="mt-3 space-y-3">
-                    {records.length ? records.map((record) => <AcademicRecordCard key={record.id} record={record} />) : (
+                    {records.length ? records.map((record) => (
+                        <AcademicRecordCard
+                            key={record.id}
+                            record={record}
+                            onEdit={onEditRecord}
+                            onDelete={onDeleteRecord}
+                        />
+                    )) : (
                         <div className="rounded-xl bg-[#f5f7f5] px-4 py-5 text-sm text-[#718078]">No academic records yet. Add an assignment, assessment, grade snapshot, or engagement snapshot.</div>
                     )}
                 </div>
