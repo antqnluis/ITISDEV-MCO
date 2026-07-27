@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import AppShell from "../components/layout/AppShell";
 import AppIcon from "../components/ui/AppIcon";
 import DashboardPageHeader from "../components/ui/DashboardPageHeader";
+import { useAuth } from "../context/useAuth";
 import { usePrototypeData } from "../context/usePrototypeData";
 import { downloadWellnessSummaryPdf } from "../services/wellnessSummaryPdf";
+import { getWellnessSummaryExport } from "../services/wellnessSummaryExportApi";
 
 const goals = ["Managing Stress", "Managing Workload", "Time Management", "Healthy Routines", "Academic Balance", "Better Sleep", "Staying Motivated"];
 const responsibilities = [
@@ -22,7 +24,8 @@ function FormField({ id, label, hint, children }) {
 }
 
 function Settings() {
-    const { student, profile, updateSettings, exportWellnessSummary } = usePrototypeData();
+    const { authenticatedRequest } = useAuth();
+    const { student, profile, updateSettings } = usePrototypeData();
     const navigate = useNavigate();
     const [studentForm, setStudentForm] = useState({ ...student });
     const [profileForm, setProfileForm] = useState({ ...profile, wellness_goals: [...profile.wellness_goals] });
@@ -71,7 +74,8 @@ function Settings() {
         setExportPrepared(false);
         setExportError(false);
         try {
-            await downloadWellnessSummaryPdf(exportWellnessSummary());
+            const wellnessSummary = await getWellnessSummaryExport(authenticatedRequest);
+            await downloadWellnessSummaryPdf(wellnessSummary);
             setExportPrepared(true);
         } catch {
             setExportError(true);

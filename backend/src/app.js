@@ -9,6 +9,7 @@ const academicRecordRoutes = require("./routes/academicRecordRoutes");
 const courseEnvironmentLogRoutes = require("./routes/courseEnvironmentLogRoutes");
 const calendarEventRoutes = require("./routes/calendarEventRoutes");
 const wellnessDimensionScoreRoutes = require("./routes/wellnessDimensionScoreRoutes");
+const exportRoutes = require("./routes/exportRoutes");
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use("/api/academic-records", academicRecordRoutes);
 app.use("/api/course-environment-logs", courseEnvironmentLogRoutes);
 app.use("/api/calendar-events", calendarEventRoutes);
 app.use("/api/wellness-dimension-scores", wellnessDimensionScoreRoutes);
+app.use("/api/exports", exportRoutes);
 
 app.get("/", (req, res) => {
     res.send("Backend is running");
