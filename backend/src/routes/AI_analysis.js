@@ -54,6 +54,7 @@ router.post('/check-ins/analyze', async (req, res) => {
     Analyze the student's quantitative metrics and qualitative text reflection to generate a weekly summary, high-frequency keywords, and specific actionable recommendations.
 
     STUDENT METRICS FOR THIS WEEK:
+    All five metrics are risk or concern scores. A score of 0 means low concern, while a score of 100 means high concern. Higher scores always indicate greater concern.
     - Academic Engagement Score: ${scores.academic_engagement_score}/100
     - Personal Wellbeing Score: ${scores.personal_wellbeing_score}/100
     - Logistical Load Score: ${scores.logistical_load_score}/100
@@ -65,7 +66,8 @@ router.post('/check-ins/analyze', async (req, res) => {
 
     RECOMMENDATION INSTRUCTIONS:
     - Synthesize the metrics and the student's text reflection.
-    - If a specific stress context dominates (e.g., low Course Environment score or mentions of groupmate issues), tailor the recommendations to address that dimension using the Approved Campus Support Documentation.
+    - Treat the dimension with the highest concern score as the primary stress context. If every dimension score is above 75, use "mixed" because concern is broadly high across all dimensions.
+    - If a specific stress context dominates (e.g., a high Course Environment score or mentions of groupmate issues), tailor the recommendations to address that dimension using the Approved Campus Support Documentation.
     - Keep recommendations actionable, practical, and highly specific (mentioning exact offices, emails, or Zoom details if provided in the context).
 
     CRITICAL SAFETY & ESCALATION RULE:

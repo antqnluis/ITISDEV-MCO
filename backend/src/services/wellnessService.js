@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase.js';
+import { selectPrimaryStressContext } from '../utils/wellnessRisk.mjs';
 
 export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimension_scores_id }) => {
   
@@ -20,8 +21,8 @@ export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimensi
   }
 
   // DETERMINISTIC LOGIC (Find Primary Stress Context)
-  // Map scores into an array to locate the lowest (worst performing) dimension
-  const dimensions = [
+  // Dimension scores represent concern: 0 is low concern and 100 is high concern.
+  const dimensionScores = [
     { name: 'academic_engagement', score: Number(scores.academic_engagement_score) },
     { name: 'personal_wellbeing', score: Number(scores.personal_wellbeing_score) },
     { name: 'logistical_load', score: Number(scores.logistical_load_score) },
@@ -29,14 +30,9 @@ export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimensi
     { name: 'course_environment', score: Number(scores.course_environment_score) }
   ];
 
-  // Sort ascending so the lowest score comes first
-  dimensions.sort((a, b) => a.score - b.score);
-  let primaryContext = dimensions[0].name;
-  
-  // If the lowest score is still relatively healthy, mark as mixed
-  if (dimensions[0].score > 75) {
-    primaryContext = 'mixed';
-  }
+  const contextSelection = selectPrimaryStressContext(dimensionScores);
+  const dimensions = contextSelection.orderedDimensions;
+  let primaryContext = contextSelection.primaryContext;
 
   // MOCK RETRIEVAL (SQL Category Filtering instead of Vectors)
   const { data: resources } = await supabase
