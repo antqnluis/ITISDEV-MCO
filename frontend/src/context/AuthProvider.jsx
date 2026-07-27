@@ -6,6 +6,7 @@ import {
   registerAccount,
   resolveAccountDestination,
   submitConsent,
+  updateCurrentAccount,
 } from "../services/authApi";
 import { ApiError, apiRequest } from "../services/apiClient";
 import { createStudentProfile } from "../services/profileApi";
@@ -198,6 +199,38 @@ export function AuthProvider({ children }) {
     }
   }, [authState.postConsentDestination, authState.student, authState.user, clearAuthentication, commitAuthentication]);
 
+  const updateStudentDetails = useCallback(async (payload) => {
+    const token = sessionRef.current?.access_token;
+    if (!token) {
+      clearAuthentication();
+      throw new ApiError("Your session has expired. Please sign in again.", 401);
+    }
+
+    try {
+      const result = await updateCurrentAccount(token, payload);
+      const nextStudent = { ...authState.student, ...result.student };
+      commitAuthentication({
+        session: sessionRef.current,
+        student: nextStudent,
+        user: authState.user,
+        postConsentDestination: authState.postConsentDestination,
+      }, authState.accountDestination);
+      return nextStudent;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearAuthentication();
+      }
+      throw error;
+    }
+  }, [
+    authState.accountDestination,
+    authState.postConsentDestination,
+    authState.student,
+    authState.user,
+    clearAuthentication,
+    commitAuthentication,
+  ]);
+
   const completeOnboarding = useCallback(async (payload) => {
     const token = sessionRef.current?.access_token;
     if (!token) {
@@ -248,7 +281,8 @@ export function AuthProvider({ children }) {
     login,
     logout,
     register,
-  }), [acceptConsent, authenticatedRequest, authState, completeOnboarding, login, logout, register]);
+    updateStudentDetails,
+  }), [acceptConsent, authenticatedRequest, authState, completeOnboarding, login, logout, register, updateStudentDetails]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

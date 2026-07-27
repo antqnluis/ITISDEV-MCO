@@ -248,6 +248,125 @@ test("getCurrentStudent scopes the query to the authenticated student and logout
     assert.equal(signedOutToken, "access-token");
 });
 
+test("updateCurrentStudent accepts only validated student names", { concurrency: false }, async () => {
+    const authService = loadModule(servicePath, {});
+
+    await assert.rejects(
+        authService.updateCurrentStudent({}, "student-id", {}),
+        (error) => error.statusCode === 400
+            && error.message.includes("At least one student field")
+    );
+    await assert.rejects(
+        authService.updateCurrentStudent({}, "student-id", {
+            student_number: "20240002"
+        }),
+        (error) => error.statusCode === 400
+            && error.message.includes("not an editable student field")
+    );
+    await assert.rejects(
+        authService.updateCurrentStudent({}, "student-id", {
+            first_name: " "
+        }),
+        (error) => error.statusCode === 400
+            && error.message.includes("first_name is required")
+    );
+    await assert.rejects(
+        authService.updateCurrentStudent({}, "student-id", {
+            last_name: "x".repeat(101)
+        }),
+        (error) => error.statusCode === 400
+            && error.message.includes("at most 100 characters")
+    );
+});
+
+test("updateCurrentStudent trims names and scopes the update to the authenticated student", { concurrency: false }, async () => {
+    const authService = loadModule(servicePath, {});
+    let updatedValues;
+    let updatedStudentId;
+    const updatedStudent = {
+        id: "student-id",
+        student_number: "20240001",
+        first_name: "Jamie",
+        last_name: "Reyes"
+    };
+    const supabase = {
+        from: (table) => {
+            assert.equal(table, "students");
+            return {
+                update: (values) => {
+                    updatedValues = values;
+                    return {
+                        eq: (field, value) => {
+                            assert.equal(field, "id");
+                            updatedStudentId = value;
+                            return {
+                                select: () => ({
+                                    maybeSingle: async () => ({
+                                        data: updatedStudent,
+                                        error: null
+                                    })
+                                })
+                            };
+                        }
+                    };
+                }
+            };
+        }
+    };
+
+    const result = await authService.updateCurrentStudent(
+        supabase,
+        "student-id",
+        {
+            first_name: " Jamie ",
+            last_name: " Reyes "
+        }
+    );
+
+    assert.deepEqual(updatedValues, {
+        first_name: "Jamie",
+        last_name: "Reyes"
+    });
+    assert.equal(updatedStudentId, "student-id");
+    assert.deepEqual(result, updatedStudent);
+});
+
+test("updateCurrentStudent reports missing students and database failures", { concurrency: false }, async () => {
+    const authService = loadModule(servicePath, {});
+
+    function updateResponse(response) {
+        return {
+            from: () => ({
+                update: () => ({
+                    eq: () => ({
+                        select: () => ({
+                            maybeSingle: async () => response
+                        })
+                    })
+                })
+            })
+        };
+    }
+
+    await assert.rejects(
+        authService.updateCurrentStudent(
+            updateResponse({ data: null, error: null }),
+            "student-id",
+            { first_name: "Jamie" }
+        ),
+        (error) => error.statusCode === 404
+    );
+    await assert.rejects(
+        authService.updateCurrentStudent(
+            updateResponse({ data: null, error: { message: "database detail" } }),
+            "student-id",
+            { first_name: "Jamie" }
+        ),
+        (error) => error.statusCode === 500
+            && error.message === "Unable to update the current student"
+    );
+});
+
 test("requireAuth rejects missing credentials and attaches a verified user", { concurrency: false }, async () => {
     const { requireAuth } = loadModule(middlewarePath, {
         publicSupabase: {

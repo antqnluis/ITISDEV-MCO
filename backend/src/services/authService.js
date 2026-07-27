@@ -16,6 +16,11 @@ const STUDENT_SELECT = [
     "updated_at"
 ].join(", ");
 
+const EDITABLE_STUDENT_FIELDS = new Set([
+    "first_name",
+    "last_name"
+]);
+
 function createServiceError(message, statusCode = 400) {
     const error = new Error(message);
     error.statusCode = statusCode;
@@ -38,6 +43,31 @@ function getStudentName(value, fieldName) {
     }
 
     return normalized;
+}
+
+function isPlainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeStudentUpdateInput(payload) {
+    if (!isPlainObject(payload)) {
+        throw createServiceError("Request body must be a JSON object");
+    }
+
+    const fields = Object.keys(payload);
+    if (fields.length === 0) {
+        throw createServiceError("At least one student field is required");
+    }
+
+    const student = {};
+    for (const field of fields) {
+        if (!EDITABLE_STUDENT_FIELDS.has(field)) {
+            throw createServiceError(`${field} is not an editable student field`);
+        }
+        student[field] = getStudentName(payload[field], field);
+    }
+
+    return student;
 }
 
 function getAuthErrorStatus(error, fallbackStatus = 400) {
@@ -168,6 +198,26 @@ async function getCurrentStudent(supabase, userId) {
     return data;
 }
 
+async function updateCurrentStudent(supabase, userId, payload) {
+    const student = normalizeStudentUpdateInput(payload);
+    const { data, error } = await supabase
+        .from("students")
+        .update(student)
+        .eq("id", userId)
+        .select(STUDENT_SELECT)
+        .maybeSingle();
+
+    if (error) {
+        throw createServiceError("Unable to update the current student", 500);
+    }
+
+    if (!data) {
+        throw createServiceError("Student record not found", 404);
+    }
+
+    return data;
+}
+
 async function logoutStudent(accessToken) {
     await signOutSession(accessToken);
 }
@@ -176,5 +226,6 @@ module.exports = {
     registerStudent,
     loginStudent,
     getCurrentStudent,
+    updateCurrentStudent,
     logoutStudent
 };

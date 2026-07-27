@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppShell from "../components/layout/AppShell";
 import AppIcon from "../components/ui/AppIcon";
 import DashboardPageHeader from "../components/ui/DashboardPageHeader";
 import { useAuth } from "../context/useAuth";
-import { usePrototypeData } from "../context/usePrototypeData";
+import { getStudentProfile, updateStudentProfile } from "../services/profileApi";
 import { downloadWellnessSummaryPdf } from "../services/wellnessSummaryPdf";
 import { getWellnessSummaryExport } from "../services/wellnessSummaryExportApi";
 
@@ -23,30 +23,107 @@ function FormField({ id, label, hint, children }) {
     return <div><label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-[#345449]">{label}</label>{children}{hint && <p className="mt-1.5 text-xs leading-5 text-[#829089]">{hint}</p>}</div>;
 }
 
+function getFailureMessage(result) {
+    return result.reason instanceof Error
+        ? result.reason.message
+        : "Please try again.";
+}
+
+function toProfileUpdatePayload(profile) {
+    const payload = {
+        college: profile.college,
+        program: profile.program,
+        year_level: Number(profile.year_level),
+        current_academic_term: Number(profile.current_academic_term),
+        wellness_goals: [...profile.wellness_goals],
+        commute_minutes_per_day: Number(profile.commute_minutes_per_day || 0),
+        available_study_hours_per_week: Number(profile.available_study_hours_per_week || 0),
+        additional_context: profile.additional_context || null,
+    };
+
+    responsibilities.forEach((item) => {
+        payload[item.enabled] = Boolean(profile[item.enabled]);
+        payload[item.hours] = payload[item.enabled]
+            ? Number(profile[item.hours] || 0)
+            : 0;
+    });
+    payload.organization_role = payload.has_organization_responsibility
+        ? profile.organization_role || null
+        : null;
+
+    return payload;
+}
+
 function Settings() {
-    const { authenticatedRequest } = useAuth();
-    const { student, profile, updateSettings } = usePrototypeData();
+    const {
+        authenticatedRequest,
+        logout,
+        student,
+        updateStudentDetails,
+        user,
+    } = useAuth();
     const navigate = useNavigate();
-    const [studentForm, setStudentForm] = useState({ ...student });
-    const [profileForm, setProfileForm] = useState({ ...profile, wellness_goals: [...profile.wellness_goals] });
+    const [studentForm, setStudentForm] = useState({
+        first_name: student.first_name,
+        last_name: student.last_name,
+    });
+    const [profileForm, setProfileForm] = useState(null);
+    const [loadAttempt, setLoadAttempt] = useState(0);
+    const [loadingProfile, setLoadingProfile] = useState(true);
+    const [loadError, setLoadError] = useState("");
     const [saved, setSaved] = useState(false);
+    const [saveError, setSaveError] = useState("");
+    const [saving, setSaving] = useState(false);
     const [exportPrepared, setExportPrepared] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [exportError, setExportError] = useState(false);
+    const [signingOut, setSigningOut] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        getStudentProfile(authenticatedRequest)
+            .then((profile) => {
+                if (cancelled) return;
+                setProfileForm({
+                    ...profile,
+                    wellness_goals: [...(profile.wellness_goals || [])],
+                });
+                setLoadingProfile(false);
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                setLoadError(error.message || "Unable to load your settings.");
+                setLoadingProfile(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [authenticatedRequest, loadAttempt]);
+
+    function retryProfileLoad() {
+        setLoadingProfile(true);
+        setLoadError("");
+        setLoadAttempt((attempt) => attempt + 1);
+    }
 
     function updateStudent(event) {
         setSaved(false);
+        setSaveError("");
         setStudentForm((current) => ({ ...current, [event.target.name]: event.target.value }));
     }
 
     function updateProfile(event) {
         const { name, value, type, checked } = event.target;
         setSaved(false);
+        setSaveError("");
         setProfileForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
     }
 
     function toggleGoal(goal) {
         setSaved(false);
+        setSaveError("");
         setProfileForm((current) => ({
             ...current,
             wellness_goals: current.wellness_goals.includes(goal)
@@ -55,18 +132,54 @@ function Settings() {
         }));
     }
 
-    function submit(event) {
+    async function submit(event) {
         event.preventDefault();
-        const numberFields = ["year_level", "current_academic_term", "commute_minutes_per_day", "available_study_hours_per_week", ...responsibilities.map((item) => item.hours)];
-        const normalizedProfile = { ...profileForm };
-        numberFields.forEach((field) => { normalizedProfile[field] = Number(normalizedProfile[field] || 0); });
-        responsibilities.forEach((item) => {
-            if (!normalizedProfile[item.enabled]) normalizedProfile[item.hours] = 0;
-        });
-        if (!normalizedProfile.has_organization_responsibility) normalizedProfile.organization_role = null;
-        updateSettings(studentForm, normalizedProfile);
-        setSaved(true);
+        if (!profileForm || saving) return;
+
+        const normalizedProfile = toProfileUpdatePayload(profileForm);
+
+        setSaving(true);
+        setSaved(false);
+        setSaveError("");
+        const [studentResult, profileResult] = await Promise.allSettled([
+            updateStudentDetails({
+                first_name: studentForm.first_name,
+                last_name: studentForm.last_name,
+            }),
+            updateStudentProfile(authenticatedRequest, normalizedProfile),
+        ]);
+
+        if (studentResult.status === "fulfilled") {
+            setStudentForm({
+                first_name: studentResult.value.first_name,
+                last_name: studentResult.value.last_name,
+            });
+        }
+        if (profileResult.status === "fulfilled") {
+            setProfileForm({
+                ...profileResult.value,
+                wellness_goals: [...(profileResult.value.wellness_goals || [])],
+            });
+        }
+
+        if (studentResult.status === "fulfilled" && profileResult.status === "fulfilled") {
+            setSaved(true);
+        } else if (studentResult.status === "fulfilled") {
+            setSaveError(`Your personal information was saved, but your profile settings could not be saved. ${getFailureMessage(profileResult)}`);
+        } else if (profileResult.status === "fulfilled") {
+            setSaveError(`Your profile settings were saved, but your personal information could not be saved. ${getFailureMessage(studentResult)}`);
+        } else {
+            setSaveError(`We could not save your settings. ${getFailureMessage(studentResult)} ${getFailureMessage(profileResult)}`);
+        }
+
+        setSaving(false);
         window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function signOut() {
+        setSigningOut(true);
+        await logout();
+        navigate("/", { replace: true });
     }
 
     async function prepareWellnessSummaryExport() {
@@ -92,17 +205,27 @@ function Settings() {
                 description="Keep your academic context, goals, and recurring responsibilities accurate so that future insights reflect your real week."
             />
 
-            {saved && <div role="status" className="mb-6 flex items-center gap-3 rounded-2xl border border-[#bfdbc7] bg-[#edf8f0] px-5 py-4 text-sm font-semibold text-[#2f6c47]"><span className="grid size-7 place-items-center rounded-full bg-[#4b8b62] text-white"><AppIcon name="check" className="size-4" /></span>Your settings were saved.</div>}
+            {loadingProfile && <div role="status" className="rounded-2xl border border-[#dce5df] bg-white px-5 py-8 text-center text-sm font-medium text-[#60736b]">Loading your settings…</div>}
+            {!loadingProfile && loadError && (
+                <div role="alert" className="rounded-2xl border border-[#ecd4d0] bg-[#fffafa] px-5 py-6 text-center">
+                    <p className="text-sm font-semibold text-[#8f4d46]">{loadError}</p>
+                    <button type="button" onClick={retryProfileLoad} className="mt-4 h-10 rounded-xl border border-[#d9aaa3] px-5 text-sm font-semibold text-[#914c45] hover:bg-[#fff0ee]">Try again</button>
+                </div>
+            )}
+            {!loadingProfile && !loadError && profileForm && (
+                <>
+                    {saved && <div role="status" className="mb-6 flex items-center gap-3 rounded-2xl border border-[#bfdbc7] bg-[#edf8f0] px-5 py-4 text-sm font-semibold text-[#2f6c47]"><span className="grid size-7 place-items-center rounded-full bg-[#4b8b62] text-white"><AppIcon name="check" className="size-4" /></span>Your settings were saved.</div>}
+                    {saveError && <div role="alert" className="mb-6 rounded-2xl border border-[#ecd4d0] bg-[#fffafa] px-5 py-4 text-sm font-semibold leading-6 text-[#914c45]">{saveError}</div>}
 
-            <form onSubmit={submit} className="grid gap-6 xl:grid-cols-[1fr_340px]">
-                <div className="space-y-6">
+                    <form onSubmit={submit} className="grid gap-6 xl:grid-cols-[1fr_340px]">
+                <fieldset disabled={saving} className="min-w-0 space-y-6 border-0 p-0 disabled:opacity-75">
                     <section className="rounded-[20px] border border-[#e0e7e2] bg-white p-6 shadow-[0_5px_20px_rgba(22,51,40,0.035)] sm:p-7">
                         <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#edf4ee] text-[#47775a]"><AppIcon name="user" className="size-5" /></span><div><h2 className="font-serif text-xl font-semibold text-[#173e30]">Personal information</h2><p className="mt-0.5 text-xs text-[#798881]">Stored with your student account</p></div></div>
                         <div className="mt-6 grid gap-5 sm:grid-cols-2">
                             <FormField id="first-name" label="First name"><input id="first-name" name="first_name" required maxLength={100} value={studentForm.first_name} onChange={updateStudent} className={inputClass} /></FormField>
                             <FormField id="last-name" label="Last name"><input id="last-name" name="last_name" required maxLength={100} value={studentForm.last_name} onChange={updateStudent} className={inputClass} /></FormField>
-                            <FormField id="student-number" label="Student number"><input id="student-number" name="student_number" required minLength={4} maxLength={30} value={studentForm.student_number} onChange={updateStudent} className={inputClass} /></FormField>
-                            <FormField id="email-address" label="DLSU email" hint="Email changes require account verification."><input id="email-address" type="email" disabled value={studentForm.email} className={inputClass} /></FormField>
+                            <FormField id="student-number" label="Student number" hint="Student number changes are not available here."><input id="student-number" disabled value={student.student_number || ""} className={inputClass} /></FormField>
+                            <FormField id="email-address" label="DLSU email" hint="Email changes require account verification."><input id="email-address" type="email" disabled value={user.email || ""} className={inputClass} /></FormField>
                         </div>
                     </section>
 
@@ -145,8 +268,8 @@ function Settings() {
                         <div className="mt-6"><FormField id="additional-context" label="Additional context" hint="Optional details that help explain your usual workload or schedule."><textarea id="additional-context" name="additional_context" rows={4} maxLength={2000} value={profileForm.additional_context || ""} onChange={updateProfile} className={`${inputClass} h-auto py-3`} /></FormField></div>
                     </section>
 
-                    <div className="flex justify-end"><button type="submit" className="h-12 w-full rounded-xl bg-[#3f7854] px-7 text-sm font-semibold text-white shadow-[0_5px_14px_rgba(37,89,58,0.2)] hover:bg-[#356c49] sm:w-auto">Save settings</button></div>
-                </div>
+                    <div className="flex justify-end"><button type="submit" disabled={saving} className="h-12 w-full rounded-xl bg-[#3f7854] px-7 text-sm font-semibold text-white shadow-[0_5px_14px_rgba(37,89,58,0.2)] hover:bg-[#356c49] disabled:cursor-wait disabled:opacity-70 sm:w-auto">{saving ? "Saving settings…" : "Save settings"}</button></div>
+                </fieldset>
 
                 <aside className="space-y-6 xl:self-start">
                     <section className="rounded-[20px] border border-[#dce5df] bg-[#edf5ef] p-6">
@@ -166,10 +289,12 @@ function Settings() {
                     <section className="rounded-[20px] border border-[#ecd4d0] bg-[#fffafa] p-6">
                         <h2 className="font-serif text-lg font-semibold text-[#713e39]">Session</h2>
                         <p className="mt-2 text-sm leading-6 text-[#8b6b67]">Signing out returns to the login screen.</p>
-                        <button type="button" onClick={() => navigate("/")} className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#e2bdb7] text-sm font-semibold text-[#9a4f47] hover:bg-[#fff0ee]"><AppIcon name="logout" className="size-4" /> Sign out</button>
+                        <button type="button" onClick={signOut} disabled={signingOut} className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#e2bdb7] text-sm font-semibold text-[#9a4f47] hover:bg-[#fff0ee] disabled:cursor-wait disabled:opacity-70"><AppIcon name="logout" className="size-4" /> {signingOut ? "Signing out…" : "Sign out"}</button>
                     </section>
                 </aside>
-            </form>
+                    </form>
+                </>
+            )}
         </AppShell>
     );
 }

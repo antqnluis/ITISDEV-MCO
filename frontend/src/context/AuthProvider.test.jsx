@@ -49,6 +49,29 @@ function AuthenticatedRequestProbe() {
   return <button type="button" onClick={requestCourses}>{result || "request courses"}</button>;
 }
 
+function StudentUpdateProbe() {
+  const { student, updateStudentDetails } = useAuth();
+  const [result, setResult] = useState("");
+
+  async function updateStudent() {
+    try {
+      const updated = await updateStudentDetails({
+        first_name: "Jamie",
+        last_name: "Reyes",
+      });
+      setResult(updated.first_name);
+    } catch (error) {
+      setResult(error.message);
+    }
+  }
+
+  return (
+    <button type="button" onClick={updateStudent}>
+      {result || `update ${student?.first_name || "none"}`}
+    </button>
+  );
+}
+
 const storedAccount = {
   session: { access_token: "access-token", expires_at: 2_000_000_000 },
   user: { id: "student-1", email: "student@example.com" },
@@ -227,6 +250,82 @@ describe("AuthProvider hydration", () => {
     render(<AuthProvider><Probe /><AuthenticatedRequestProbe /></AuthProvider>);
     await screen.findByText("authenticated:/dashboard:/dashboard:Cached");
     await user.click(screen.getByRole("button", { name: "request courses" }));
+
+    expect(await screen.findByText("unauthenticated:/:/dashboard:none")).toBeInTheDocument();
+    expect(window.sessionStorage).toHaveLength(0);
+  });
+
+  it("updates student names in context and session storage", async () => {
+    const user = userEvent.setup();
+    writeStoredAuth(storedAccount);
+    const updatedStudent = {
+      ...storedAccount.student,
+      first_name: "Jamie",
+      last_name: "Reyes",
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        user: storedAccount.user,
+        student: storedAccount.student,
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        student: updatedStudent,
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <Probe />
+        <StudentUpdateProbe />
+      </AuthProvider>,
+    );
+    await user.click(await screen.findByRole("button", { name: "update Cached" }));
+
+    expect(await screen.findByText("authenticated:/dashboard:/dashboard:Jamie"))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Jamie" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/auth\/me$/);
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({
+      method: "PATCH",
+      body: JSON.stringify({
+        first_name: "Jamie",
+        last_name: "Reyes",
+      }),
+      headers: expect.objectContaining({
+        Authorization: "Bearer access-token",
+      }),
+    });
+    expect(JSON.parse(window.sessionStorage.getItem("animolog.auth.session.v1")))
+      .toMatchObject({
+        student: {
+          first_name: "Jamie",
+          last_name: "Reyes",
+        },
+      });
+  });
+
+  it("clears authentication when a student-name update returns 401", async () => {
+    const user = userEvent.setup();
+    writeStoredAuth(storedAccount);
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        user: storedAccount.user,
+        student: storedAccount.student,
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        message: "Invalid or expired access token",
+      }, 401)));
+
+    render(
+      <AuthProvider>
+        <Probe />
+        <StudentUpdateProbe />
+      </AuthProvider>,
+    );
+    await user.click(await screen.findByRole("button", { name: "update Cached" }));
 
     expect(await screen.findByText("unauthenticated:/:/dashboard:none")).toBeInTheDocument();
     expect(window.sessionStorage).toHaveLength(0);

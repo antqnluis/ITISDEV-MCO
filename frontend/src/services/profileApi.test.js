@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createStudentProfile } from "./profileApi";
+import {
+  createStudentProfile,
+  getStudentProfile,
+  updateStudentProfile,
+} from "./profileApi";
 
 function jsonResponse(data, status = 201) {
   return new Response(JSON.stringify(data), {
@@ -32,6 +36,26 @@ describe("profile API", () => {
       method: "POST",
       body: JSON.stringify(payload),
       headers: expect.objectContaining({ Authorization: "Bearer access-token" }),
+    });
+  });
+
+  it("loads and updates profiles through authenticated requests", async () => {
+    const currentProfile = { id: "profile-1", college: "CCS" };
+    const updatedProfile = { ...currentProfile, college: "COS" };
+    const authenticatedRequest = vi.fn()
+      .mockResolvedValueOnce({ success: true, profile: currentProfile })
+      .mockResolvedValueOnce({ success: true, profile: updatedProfile });
+
+    await expect(getStudentProfile(authenticatedRequest))
+      .resolves.toEqual(currentProfile);
+    await expect(updateStudentProfile(authenticatedRequest, {
+      college: "COS",
+    })).resolves.toEqual(updatedProfile);
+
+    expect(authenticatedRequest).toHaveBeenNthCalledWith(1, "/api/profile");
+    expect(authenticatedRequest).toHaveBeenNthCalledWith(2, "/api/profile", {
+      method: "PATCH",
+      body: { college: "COS" },
     });
   });
 });

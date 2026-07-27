@@ -27,6 +27,14 @@ export function getCurrentAccount(token) {
   return apiRequest("/api/auth/me", { token });
 }
 
+export function updateCurrentAccount(token, payload) {
+  return apiRequest("/api/auth/me", {
+    method: "PATCH",
+    token,
+    body: payload,
+  });
+}
+
 export function submitConsent(token) {
   return apiRequest("/api/consent", {
     method: "PATCH",
