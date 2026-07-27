@@ -30,13 +30,6 @@ function formatDateTime(value) {
   });
 }
 
-function formatDate(value) {
-  return new Date(value).toLocaleDateString("en-PH", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function getWellnessStatus(score) {
   if (score >= 80) return { label: "Thriving", tone: "Excellent" };
   if (score >= 65) return { label: "Steady", tone: "Stable" };
@@ -44,13 +37,36 @@ function getWellnessStatus(score) {
   return { label: "At risk", tone: "Urgent" };
 }
 
-function getMetricBadge(value, max = 5) {
+function getWellnessIndex(checkIn) {
+  if (!checkIn) return 74;
+
+  const ratings = [
+    6 - checkIn.stress_level,
+    checkIn.mood_level,
+    checkIn.sleep_quality,
+    checkIn.motivation_level,
+    6 - checkIn.burnout_level,
+    checkIn.energy_level,
+  ].filter(Number.isFinite);
+
+  return ratings.length
+    ? Math.round((ratings.reduce((total, value) => total + value, 0) / (ratings.length * 5)) * 100)
+    : 74;
+}
+
+function getMetricBadge(value) {
   const normalized = Number(value);
   if (Number.isNaN(normalized)) return "Pending";
   if (normalized <= 2) return "Low";
   if (normalized <= 3) return "Moderate";
   if (normalized <= 4) return "Elevated";
   return "High";
+}
+
+function getRiskBadge(value) {
+  if (value >= 70) return "High concern";
+  if (value >= 40) return "Moderate concern";
+  return "Low concern";
 }
 
 function Dashboard() {
@@ -68,15 +84,7 @@ function Dashboard() {
     return dimensionScores.find((score) => score.check_in_id === latestCheckIn.id) || null;
   }, [dimensionScores, latestCheckIn]);
 
-  const wellnessScore = latestScore
-    ? Math.round(
-        (latestScore.academic_engagement_score +
-          latestScore.personal_wellbeing_score +
-          latestScore.logistical_load_score +
-          latestScore.role_load_score +
-          latestScore.course_environment_score) / 5,
-      )
-    : 74;
+  const wellnessScore = getWellnessIndex(latestCheckIn);
 
   const wellnessStatus = getWellnessStatus(wellnessScore);
 
@@ -163,31 +171,31 @@ function Dashboard() {
         {
           title: "Academic engagement",
           value: `${latestScore.academic_engagement_score}/100`,
-          badge: latestScore.academic_engagement_score >= 75 ? "Healthy" : "Watch",
+          badge: getRiskBadge(latestScore.academic_engagement_score),
           description: "How engaged you felt with classes and coursework.",
         },
         {
           title: "Personal wellbeing",
           value: `${latestScore.personal_wellbeing_score}/100`,
-          badge: latestScore.personal_wellbeing_score >= 75 ? "Healthy" : "Watch",
+          badge: getRiskBadge(latestScore.personal_wellbeing_score),
           description: "How supported your everyday wellbeing felt.",
         },
         {
           title: "Logistical load",
           value: `${latestScore.logistical_load_score}/100`,
-          badge: latestScore.logistical_load_score >= 75 ? "Healthy" : "Watch",
+          badge: getRiskBadge(latestScore.logistical_load_score),
           description: "How manageable your schedule felt overall.",
         },
         {
           title: "Role load",
           value: `${latestScore.role_load_score}/100`,
-          badge: latestScore.role_load_score >= 75 ? "Healthy" : "Watch",
+          badge: getRiskBadge(latestScore.role_load_score),
           description: "How balanced your roles and responsibilities felt.",
         },
         {
           title: "Course environment",
           value: `${latestScore.course_environment_score}/100`,
-          badge: latestScore.course_environment_score >= 75 ? "Healthy" : "Watch",
+          badge: getRiskBadge(latestScore.course_environment_score),
           description: "How clear and workable the course context felt.",
         },
       ]
