@@ -1,4 +1,4 @@
-export function selectPrimaryStressContext(dimensions) {
+function selectPrimaryStressContext(dimensions) {
   const orderedDimensions = [...dimensions].sort((a, b) => b.score - a.score);
   const allDimensionsHighConcern = orderedDimensions.every(({ score }) => score > 75);
 
@@ -9,3 +9,7 @@ export function selectPrimaryStressContext(dimensions) {
       : orderedDimensions[0].name,
   };
 }
+
+module.exports = {
+  selectPrimaryStressContext
+};

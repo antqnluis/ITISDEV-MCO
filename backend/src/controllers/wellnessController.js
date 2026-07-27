@@ -1,6 +1,6 @@
-import * as wellnessService from '../services/wellnessService.js';
+const wellnessService = require("../services/wellnessService");
 
-export const analyzeWeeklyCheckIn = async (req, res) => {
+async function analyzeWeeklyCheckIn(req, res) {
   try {
     const { student_id, check_in_id, dimension_scores_id } = req.body;
 
@@ -24,6 +24,13 @@ export const analyzeWeeklyCheckIn = async (req, res) => {
 
   } catch (error) {
     console.error("Controller Error:", error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      error: error.message
+    });
   }
+}
+
+module.exports = {
+  analyzeWeeklyCheckIn
 };

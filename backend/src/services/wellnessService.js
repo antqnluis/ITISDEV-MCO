@@ -1,7 +1,14 @@
-import { supabase } from '../config/supabase.js';
-import { selectPrimaryStressContext } from '../utils/wellnessRisk.mjs';
+const { serviceSupabase } = require("../config/supabaseClient");
+const { selectPrimaryStressContext } = require("../utils/wellnessRisk");
 
-export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimension_scores_id }) => {
+async function runMockWellnessPipeline({ student_id, check_in_id, dimension_scores_id }) {
+  if (!serviceSupabase) {
+    const error = new Error("SUPABASE_SERVICE_ROLE_KEY is required for wellness analysis");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const supabase = serviceSupabase;
   
   // FETCH RAW DATA FROM SUPABASE
   const { data: checkIn, error: checkInErr } = await supabase
@@ -91,7 +98,6 @@ export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimensi
   // Calculated compound Student Wellness Index (SWI) score out of 100
   const calculatedSwi = Math.round(dimensions.reduce((sum, d) => sum + d.score, 0) / dimensions.length);
 
-  /
   // SAVE FINAL DATA OBJECT TO DB
   const { data: insertedResult, error: dbError } = await supabase
     .from('ai_results')
@@ -115,4 +121,8 @@ export const runMockWellnessPipeline = async ({ student_id, check_in_id, dimensi
   if (dbError) throw dbError;
 
   return insertedResult;
+}
+
+module.exports = {
+  runMockWellnessPipeline
 };

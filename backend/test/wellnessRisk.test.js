@@ -1,13 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { selectPrimaryStressContext } = require("../src/utils/wellnessRisk");
 
-async function loadSelector() {
-    const { selectPrimaryStressContext } = await import("../src/utils/wellnessRisk.mjs");
-    return selectPrimaryStressContext;
-}
-
-test("the highest concern score determines the primary stress context", async () => {
-    const selectPrimaryStressContext = await loadSelector();
+test("the highest concern score determines the primary stress context", () => {
     const result = selectPrimaryStressContext([
         { name: "academic_engagement", score: 20 },
         { name: "personal_wellbeing", score: 80 },
@@ -20,8 +15,7 @@ test("the highest concern score determines the primary stress context", async ()
     assert.equal(result.orderedDimensions[0].score, 80);
 });
 
-test("broadly high concern across every dimension produces mixed context", async () => {
-    const selectPrimaryStressContext = await loadSelector();
+test("broadly high concern across every dimension produces mixed context", () => {
     const result = selectPrimaryStressContext([
         { name: "academic_engagement", score: 91 },
         { name: "personal_wellbeing", score: 92 },
@@ -33,8 +27,7 @@ test("broadly high concern across every dimension produces mixed context", async
     assert.equal(result.primaryContext, "mixed");
 });
 
-test("zero remains low concern and 100 remains high concern", async () => {
-    const selectPrimaryStressContext = await loadSelector();
+test("zero remains low concern and 100 remains high concern", () => {
     const result = selectPrimaryStressContext([
         { name: "academic_engagement", score: 0 },
         { name: "personal_wellbeing", score: 100 },
