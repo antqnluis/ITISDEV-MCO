@@ -9,6 +9,7 @@ import Calendar from "../pages/Calendar";
 import WeeklyCheckIn from "../pages/WeeklyCheckIn";
 import AcademicRecords from "../pages/AcademicRecords";
 import Settings from "../pages/Settings";
+import WellnessPlan from "../pages/WellnessPlan";
 
 function AppRouter() {
     return (
@@ -22,6 +23,7 @@ function AppRouter() {
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/check-in" element={<WeeklyCheckIn />} />
                 <Route path="/academic-records" element={<AcademicRecords />} />
+                <Route path="/wellness-plan" element={<WellnessPlan />} />
                 <Route path="/settings" element={<Settings />} />
             </Routes>
         </BrowserRouter>
