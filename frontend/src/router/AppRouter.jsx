@@ -14,6 +14,7 @@ import Calendar from "../pages/Calendar";
 import WeeklyCheckIn from "../pages/WeeklyCheckIn";
 import AcademicRecords from "../pages/AcademicRecords";
 import Settings from "../pages/Settings";
+import WellnessPlan from "../pages/WellnessPlan";
 
 function AppRouter() {
     return (
@@ -31,6 +32,7 @@ function AppRouter() {
                 <Route path="/calendar" element={<RequireAuth requireConsent><Calendar /></RequireAuth>} />
                 <Route path="/check-in" element={<RequireAuth requireConsent><WeeklyCheckIn /></RequireAuth>} />
                 <Route path="/academic-records" element={<RequireAuth requireConsent><AcademicRecords /></RequireAuth>} />
+                <Route path="/wellness-plan" element={<WellnessPlan />} />
                 <Route path="/settings" element={<RequireAuth requireConsent><Settings /></RequireAuth>} />
             </Routes>
         </BrowserRouter>
