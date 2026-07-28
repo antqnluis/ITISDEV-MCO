@@ -38,6 +38,10 @@
 └── README.md
 ```
 
+## Documentation
+
+- [Application data dictionary](docs/DATA_DICTIONARY.md)
+
 ## How to Run
 
 ### Backend
