@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import AppShell from "../components/layout/AppShell";
 import AppIcon from "../components/ui/AppIcon";
 import DashboardPageHeader from "../components/ui/DashboardPageHeader";
@@ -93,6 +94,13 @@ function WeeklyCheckIn() {
               <div className="mt-5 grid gap-4 sm:grid-cols-[0.35fr_1fr]">
                 <div className="rounded-xl bg-[#edf5ef] p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[#63806f]">Study time</p><p className="mt-2 text-xl font-bold text-[#285b3d]">{selected.available_study_hours} hours</p></div>
                 <blockquote className="rounded-xl bg-[#f6f7f5] p-4 text-sm italic leading-6 text-[#60736b]">“{selected.reflection || "No reflection was added."}”</blockquote>
+              </div>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Link to="/wellness-plan" className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#3f7854] px-4 text-sm font-semibold text-white shadow-[0_5px_14px_rgba(37,89,58,0.2)] hover:bg-[#356c49]">
+                  <AppIcon name="sparkles" className="size-[18px]" />
+                  View AI wellness plan
+                </Link>
+                <p className="text-sm text-[#6f8178]">The plan uses mock AI results for now and updates with your latest submission.</p>
               </div>
             </section>
 

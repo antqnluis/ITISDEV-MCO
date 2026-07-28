@@ -318,6 +318,10 @@ function Dashboard() {
                 <span>Start or update weekly check-in</span>
                 <span>→</span>
               </Link>
+              <Link to="/wellness-plan" className="flex items-center justify-between rounded-xl border border-[#dfe8e0] bg-[#fcfdfb] px-4 py-3 text-sm font-semibold text-[#234638] hover:bg-[#f2f6f2]">
+                <span>Open AI wellness plan</span>
+                <span>→</span>
+              </Link>
               <Link to="/calendar" className="flex items-center justify-between rounded-xl border border-[#dfe8e0] bg-[#fcfdfb] px-4 py-3 text-sm font-semibold text-[#234638] hover:bg-[#f2f6f2]">
                 <span>Add a calendar event</span>
                 <span>→</span>
@@ -333,6 +337,7 @@ function Dashboard() {
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link to="/calendar" className="rounded-full border border-[#dfe8e0] px-3 py-1.5 text-sm text-[#4d665c] hover:bg-[#f2f6f2]">Calendar</Link>
                 <Link to="/check-in" className="rounded-full border border-[#dfe8e0] px-3 py-1.5 text-sm text-[#4d665c] hover:bg-[#f2f6f2]">Weekly Check-in</Link>
+                <Link to="/wellness-plan" className="rounded-full border border-[#dfe8e0] px-3 py-1.5 text-sm text-[#4d665c] hover:bg-[#f2f6f2]">Wellness Plan</Link>
                 <Link to="/academic-records" className="rounded-full border border-[#dfe8e0] px-3 py-1.5 text-sm text-[#4d665c] hover:bg-[#f2f6f2]">Academic Records</Link>
               </div>
             </div>
