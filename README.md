@@ -403,7 +403,7 @@ Academic-record and course-environment-log responses include `course_id` and a n
 
 ## Demo Student Seed
 
-The backend includes a comprehensive demo persona for midterm testing: a working third-year IT student who is also completing OJT, competing as an athlete, serving as an organization vice president, commuting, and providing family care. The seed fills every application table with related profile, wellbeing, academic, course-environment, calendar, and AI-result data.
+The backend includes a comprehensive severe-stress demo persona for midterm testing: a working third-year IT student balancing commuting, family care, and communications responsibilities in a student organization. The seed fills every application table with related profile, wellbeing, academic, course-environment, calendar, dimension-score, and placeholder AI-result data.
 
 Add the following server-only values to `backend/.env`:
 
@@ -412,6 +412,8 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 SEED_USER_EMAIL=demo.student@example.com
 SEED_USER_PASSWORD=choose_a_demo_password
 SEED_STUDENT_NUMBER=20260001
+SEED_FIRST_NAME=Andrea
+SEED_LAST_NAME=Santos
 ```
 
 Never expose the service-role key to the frontend or commit it to source control. Then run:
@@ -421,7 +423,9 @@ cd backend
 npm run seed:demo
 ```
 
-Dates are anchored to the current Monday in `Asia/Manila`, keeping overdue and upcoming midterm activity current. Rerunning the command updates the Auth credentials, deletes only this demo user's public application records, and recreates a clean dataset without duplicates. The command prints table counts and login identifiers but does not print the password or service-role key.
+Dates are anchored to the current Monday in `Asia/Manila`, keeping overdue and upcoming midterm activity current. Record IDs are stable for one Auth user and unique across different demo users, so multiple demo accounts can coexist. Rerunning the command updates and replaces data only when the matching Auth account was previously created by this seed; it refuses to overwrite a normal account. The command prints table counts and login identifiers but does not print the password or service-role key.
+
+The seeded data populates Dashboard, Calendar, Weekly Check-In, Academic Records, and Settings. AI-result rows are placeholders for future backend integration; the Wellness Plan page remains frontend-demo-only.
 
 To run the academic engagement calculator against the records that were actually inserted into Supabase, use:
 

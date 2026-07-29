@@ -104,6 +104,20 @@ describe("Calendar page", () => {
     );
   });
 
+  it("shows seeded events as read-only", async () => {
+    listAllCalendarEvents.mockResolvedValue([{
+      ...currentEvent,
+      id: "33333333-3333-4333-8333-333333333333",
+      source: "mock",
+      title: "Seeded work shift",
+    }]);
+    renderPage();
+
+    expect(await screen.findByText("Seeded work shift")).toBeInTheDocument();
+    expect(screen.getByText("Seeded")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit Seeded work shift" })).not.toBeInTheDocument();
+  });
+
   it("shows load failures and retries", async () => {
     const user = userEvent.setup();
     listAllCalendarEvents

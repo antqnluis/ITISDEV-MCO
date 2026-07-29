@@ -369,7 +369,11 @@ function Calendar() {
                                                     <article key={event.id} className={`group rounded-xl border p-3 ${eventStyle[event.event_type] || eventStyle.other} ${event.status === "cancelled" ? "opacity-55" : ""}`}>
                                                         <div className="flex items-start justify-between gap-1">
                                                             <p className={`text-[10px] font-bold uppercase tracking-[0.07em] ${event.status === "cancelled" ? "line-through" : ""}`}>{event.all_day ? "All day" : toDateInput(event.starts_at) === toDateInput(day) ? toTimeInput(event.starts_at) : "Continues"}</p>
-                                                            <button type="button" onClick={() => openEdit(event)} aria-label={`Edit ${event.title}`} className="grid size-6 place-items-center rounded-md opacity-0 transition hover:bg-white/60 focus:opacity-100 group-hover:opacity-100"><AppIcon name="edit" className="size-3.5" /></button>
+                                                            {event.source === "manual" ? (
+                                                                <button type="button" onClick={() => openEdit(event)} aria-label={`Edit ${event.title}`} className="grid size-6 place-items-center rounded-md opacity-0 transition hover:bg-white/60 focus:opacity-100 group-hover:opacity-100"><AppIcon name="edit" className="size-3.5" /></button>
+                                                            ) : (
+                                                                <span className="rounded-full bg-white/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.06em]">Seeded</span>
+                                                            )}
                                                         </div>
                                                         <h3 className={`mt-1 text-xs font-bold leading-4 ${event.status === "cancelled" ? "line-through" : ""}`}>{event.title}</h3>
                                                         {event.location && <p className="mt-2 flex items-start gap-1 text-[10px] leading-4 opacity-80"><AppIcon name="location" className="mt-0.5 size-3 shrink-0" />{event.location}</p>}

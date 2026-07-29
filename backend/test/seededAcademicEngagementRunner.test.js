@@ -142,7 +142,13 @@ test("Manila date and latest-week workload selection are deterministic", () => {
 });
 
 test("runSeededAcademicEngagement calculates the final value from seeded database rows", async () => {
-    const scenario = buildDemoStudentScenario({ studentId, studentNumber, now: fixedNow });
+    const scenario = buildDemoStudentScenario({
+        studentId,
+        studentNumber,
+        firstName: "Andrea",
+        lastName: "Santos",
+        now: fixedNow
+    });
     const coursesById = new Map(scenario.tables.courses.map((course) => [course.id, course]));
     const { calls, supabase } = createSupabaseMock({
         academicRecords: withGeneratedGrades(scenario.tables.academic_records).map((record) => ({
@@ -160,23 +166,23 @@ test("runSeededAcademicEngagement calculates the final value from seeded databas
         now: fixedNow
     });
 
-    assert.equal(analysis.result.score, 43);
+    assert.equal(analysis.result.score, 54);
     assert.equal(analysis.analysisDate, "2026-07-14");
     assert.equal(analysis.workloadWeekStart, "2026-07-13");
     assert.equal(analysis.academicWorkload, 5);
     assert.deepEqual(analysis.result.components, {
         academicWorkloadConcern: 100,
-        missedRequirementConcern: 20,
+        missedRequirementConcern: 40,
         lateRequirementConcern: 20,
-        deadlinePressureConcern: 40,
-        gradeDeclineConcern: 20
+        deadlinePressureConcern: 20,
+        gradeDeclineConcern: 100
     });
     assert.deepEqual(analysis.result.counts, {
         totalRequirements: 5,
-        missedRequirements: 1,
+        missedRequirements: 2,
         lateRequirements: 1,
-        upcomingDeadlines: 2,
-        coursesWithGradeComparison: 2
+        upcomingDeadlines: 1,
+        coursesWithGradeComparison: 1
     });
     assert.ok(calls.some((call) => call[0] === "student-eq" && call[2] === studentNumber));
     assert.ok(calls.some((call) => call[0] === "academic-eq" && call[2] === studentId));
