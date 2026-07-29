@@ -2,7 +2,7 @@ const { serviceSupabase } = require("../config/supabaseClient");
 const { selectPrimaryStressContext } = require("../utils/wellnessRisk");
 const Groq = require('groq');
 
-// Initialize the Groq client using your environment variables
+// Initialize the Groq client using env variables
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_id }) {
@@ -15,6 +15,7 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
   const supabase = serviceSupabase;
   
   // FETCH RAW DATA FROM SUPABASE
+
   const { data: checkIn, error: checkInErr } = await supabase
     .from('weekly_check_ins')
     .select('reflection, stress_level, burnout_level')
@@ -31,7 +32,8 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
     throw new Error(`Database record retrieval failed: ${checkInErr?.message || scoresErr?.message}`);
   }
 
-  // DETERMINISTIC LOGIC (Find Primary Stress Context)
+  // DETERMINISTIC LOGIC (Primary Context Extraction)
+  
   const dimensionScores = [
     { name: 'academic_engagement', score: Number(scores.academic_engagement_score) },
     { name: 'personal_wellbeing', score: Number(scores.personal_wellbeing_score) },
@@ -40,16 +42,17 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
     { name: 'course_environment', score: Number(scores.course_environment_score) }
   ];
 
-  // 0 = best condition, 100 = highest concern
+  // 0 (Best condition), 100 (Worst condition) 
   const contextSelection = selectPrimaryStressContext(dimensionScores);
-  const dimensions = contextSelection.orderedDimensions;
   let primaryContext = contextSelection.primaryContext;
 
   // KNOWLEDGE RETRIEVAL (SQL Category Filtering)
+  
+  const targetCategory = primaryContext === 'mixed' ? 'personal_wellbeing' : primaryContext;
   const { data: resources } = await supabase
     .from('wellness_knowledge_base')
     .select('title, content')
-    .eq('category', primaryContext === 'mixed' ? 'personal_wellbeing' : primaryContext)
+    .eq('category', targetCategory)
     .limit(1);
 
   const supportText = resources && resources.length > 0 
@@ -57,20 +60,21 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
     : "Standard wellness tracking active.";
 
   // LIVE AI PIPELINE & REFLECTION INJECTION
+
   const systemPrompt = `You are a private personal informatics wellness analyzer for De La Salle University (DLSU) students. 
-    Analyze the student's quantitative metrics, their raw written reflection text, and relevant campus guidelines to generate a structured evaluation.
+    Analyze the student's metrics, their raw written reflection, and relevant support materials to generate an assessment.
 
     CRITICAL SCORING RULE INTERPRETATION:
-    For all metrics listed below, 0 is the lowest concern (perfect/best condition) and 100 is the highest concern (worst condition). The HIGHER a score gets, the WORSE the student's actual wellness state is in that dimension. Interpret high scores near 100 as extreme strain.
+    For all metrics, 0 is the lowest concern (perfect condition) and 100 is the highest concern (worst condition). The HIGHER a score gets, the WORSE the student's state is. High scores near 100 indicate extreme strain.
 
     STUDENT METRICS FOR THIS WEEK:
-    - Academic Engagement Score: ${scores.academic_engagement_score}/100 (Higher means worse/more disengaged)
-    - Personal Wellbeing Score: ${scores.personal_wellbeing_score}/100 (Higher means worse emotional state)
-    - Logistical Load Score: ${scores.logistical_load_score}/100 (Higher means worse/heavier time load)
-    - Role Load Score: ${scores.role_load_score}/100 (Higher means worse/heavier duties)
-    - Course Environment Score: ${scores.course_environment_score}/100 (Higher means worse/more hostile environment)
+    - Academic Engagement Score: ${scores.academic_engagement_score}/100
+    - Personal Wellbeing Score: ${scores.personal_wellbeing_score}/100
+    - Logistical Load Score: ${scores.logistical_load_score}/100
+    - Role Load Score: ${scores.role_load_score}/100
+    - Course Environment Score: ${scores.course_environment_score}/100
 
-    STUDENT WRITTEN REFLECTION (READ THIS ENTIRE STRING CAREFULLY FOR CONTEXT):
+    STUDENT WRITTEN REFLECTION (READ ENTIRE STRING FOR CONTEXT):
     "${checkIn.reflection || 'No qualitative text reflection submitted this week.'}"
 
     MATCHED CAMPUS SUPPORT KNOWLEDGE (RAG CONTEXT):
@@ -94,6 +98,7 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
       "recommendations": ["Array of short, actionable time-management, behavioral, or campus support text strings"]
     }`;
 
+  // Execute high-speed inference on Groq using Llama-3.3-70b-versatile
   const completion = await groq.chat.completions.create({
     model: "llama-3.3-70b-versatile",
     messages: [
@@ -105,8 +110,17 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
 
   const aiPayload = JSON.parse(completion.choices[0].message.content);
 
-  // Calculated compound Student Wellness Index (SWI) score out of 100
-  const calculatedSwi = Math.round(dimensions.reduce((sum, d) => sum + d.score, 0) / dimensions.length);
+  // Calculate precise programmatic SWI score 
+  const totalScoreSum = 
+    Number(scores.academic_engagement_score) + 
+    Number(scores.personal_wellbeing_score) + 
+    Number(scores.logistical_load_score) + 
+    Number(scores.role_load_score) + 
+    Number(scores.course_environment_score);
+  const calculatedSwi = Number((totalScoreSum / 5).toFixed(2));
+
+  // Ensure summary string is cleanly trimmed
+  const cleanSummary = (aiPayload.weekly_summary || "").trim().substring(0, 4000);
 
   // SAVE LIVE DATA OBJECT TO DB
   const { data: insertedResult, error: dbError } = await supabase
@@ -115,15 +129,15 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
       student_id,
       check_in_id,
       dimension_scores_id,
-      swi_score: calculatedSwi,
-      risk_category: aiPayload.risk_category,
-      stress_severity_level: aiPayload.stress_severity_level,
-      primary_stress_context: aiPayload.primary_stress_context,
-      weekly_summary: aiPayload.weekly_summary,
-      reflection_keywords: aiPayload.reflection_keywords,
-      recommendations: aiPayload.recommendations,
-      analysis_method: 'rag_assisted',
-      analysis_version: '2.0-groq-live'
+      swi_score: calculatedSwi,                        
+      risk_category: aiPayload.risk_category,         
+      stress_severity_level: aiPayload.stress_severity_level, 
+      primary_stress_context: aiPayload.primary_stress_context, 
+      reflection_keywords: aiPayload.reflection_keywords || [], 
+      weekly_summary: cleanSummary,                    
+      recommendations: aiPayload.recommendations || [],
+      analysis_method: 'rag_assisted',               
+      analysis_version: '1.0'    
     }])
     .select()
     .single();
