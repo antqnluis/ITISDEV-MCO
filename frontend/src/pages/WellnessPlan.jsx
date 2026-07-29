@@ -3,10 +3,47 @@ import { Link } from "react-router-dom";
 import AppShell from "../components/layout/AppShell";
 import DashboardPageHeader from "../components/ui/DashboardPageHeader";
 import AppIcon from "../components/ui/AppIcon";
-import { buildWellnessPlanData } from "../utils/wellnessPlanData";
+import {
+  buildWellnessPlanData,
+  WELLNESS_PLAN_DEMO_INPUT,
+} from "../utils/wellnessPlanData";
+
+const severityLabels = {
+  low_normal: "Low/normal",
+  moderate: "Moderate",
+  severe: "Severe",
+  critical: "Critical",
+  pending: "Pending",
+};
+
+const riskLabels = {
+  low: "Low",
+  moderate: "Moderate",
+  high: "High",
+  pending: "Pending",
+};
+
+const contextLabels = {
+  academic_engagement: "Academic engagement",
+  personal_wellbeing: "Personal wellbeing",
+  logistical_load: "Logistical load",
+  role_load: "Role load",
+  course_environment: "Course environment",
+  mixed: "Mixed wellness dimensions",
+};
+
+function getConcernBarClass(score) {
+  if (score === null) return "bg-[#b9c4be]";
+  if (score >= 70) return "bg-[#c75d52]";
+  if (score >= 40) return "bg-[#d49a46]";
+  return "bg-[#4b9470]";
+}
 
 function WellnessPlan() {
-  const plan = useMemo(() => buildWellnessPlanData({}), []);
+  const plan = useMemo(
+    () => buildWellnessPlanData(WELLNESS_PLAN_DEMO_INPUT),
+    [],
+  );
 
   return (
     <AppShell>
@@ -31,16 +68,23 @@ function WellnessPlan() {
               <p className="mt-2 text-sm text-[#688075]">Generated {plan.generatedAt}</p>
             </div>
             <div className="rounded-2xl bg-[#f1f7f2] p-4 text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#69826f]">Student Wellness Index</p>
-              <p className="mt-2 text-4xl font-bold text-[#234638]">{plan.studentWellnessIndex}/100</p>
-              <p className="mt-2 text-sm text-[#5b7166]">{plan.stressSeverityLevel} stress severity</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#69826f]">Student Wellness Index (concern)</p>
+              <p className="mt-2 text-4xl font-bold text-[#234638]">
+                {plan.studentWellnessIndex === null ? "Pending" : `${plan.studentWellnessIndex}/100`}
+              </p>
+              <p className="mt-2 text-sm text-[#5b7166]">
+                {riskLabels[plan.riskCategory]} risk · {severityLabels[plan.stressSeverityLevel]} stress severity
+              </p>
+              <p className="mt-1 text-xs text-[#75877e]">Higher scores indicate greater concern.</p>
             </div>
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="rounded-2xl border border-[#e7ece7] bg-[#fbfdfb] p-5">
               <p className="text-sm font-semibold text-[#345449]">Primary stress context</p>
-              <p className="mt-2 text-sm leading-6 text-[#5c7068]">{plan.primaryStressContext}</p>
+              <p className="mt-2 text-sm leading-6 text-[#5c7068]">
+                {contextLabels[plan.primaryStressContext] || "Pending dimension scores"}
+              </p>
               <p className="mt-4 text-sm font-semibold text-[#345449]">Current condition</p>
               <p className="mt-2 text-sm leading-6 text-[#5c7068]">{plan.currentCondition}</p>
             </div>
@@ -65,10 +109,15 @@ function WellnessPlan() {
                 <div key={dimension.key} className="rounded-2xl border border-[#e9eee8] bg-[#fcfefd] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-[#29483b]">{dimension.label}</p>
-                    <p className="text-sm font-bold text-[#234638]">{dimension.score}/100</p>
+                    <p className="text-sm font-bold text-[#234638]">
+                      {dimension.score === null ? "Pending" : `${dimension.score}/100`}
+                    </p>
                   </div>
                   <div className="mt-2 h-2 rounded-full bg-[#edf3ee]">
-                    <div className="h-2 rounded-full bg-[#4b9470]" style={{ width: `${dimension.score}%` }} />
+                    <div
+                      className={`h-2 rounded-full ${getConcernBarClass(dimension.score)}`}
+                      style={{ width: `${dimension.score ?? 0}%` }}
+                    />
                   </div>
                   <p className="mt-3 text-sm leading-6 text-[#64766f]">{dimension.explanation}</p>
                 </div>
@@ -124,25 +173,25 @@ function WellnessPlan() {
           </div>
 
           <div className="rounded-[24px] border border-[#e1e8e1] bg-white p-6 shadow-[0_8px_24px_rgba(22,51,40,0.04)]">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#789087]">Previous wellness plans</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#789087]">Check-in history</p>
             <h2 className="mt-1 font-serif text-xl font-semibold text-[#173e30]">Earlier weekly check-ins</h2>
-            {plan.previousPlans.length ? (
+            {plan.checkInHistory.length ? (
               <div className="mt-5 space-y-3">
-                {plan.previousPlans.map((entry) => (
+                {plan.checkInHistory.map((entry) => (
                   <div key={entry.id} className="rounded-2xl border border-[#e7ece7] bg-[#fbfdfb] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-[#29483b]">{entry.weekLabel}</p>
-                        <p className="mt-1 text-xs text-[#73837b]">Generated {entry.generatedAt}</p>
+                        <p className="mt-1 text-xs text-[#73837b]">Submitted {entry.submittedAt}</p>
                       </div>
-                      <span className="rounded-full bg-[#eef5ef] px-2.5 py-1 text-xs font-semibold text-[#4b7858]">Previous</span>
+                      <span className="rounded-full bg-[#eef5ef] px-2.5 py-1 text-xs font-semibold text-[#4b7858]">Check-in</span>
                     </div>
                     <p className="mt-3 text-sm leading-6 text-[#64766f]">{entry.summary}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="mt-5 rounded-2xl border border-dashed border-[#cfd8cf] bg-[#f9fcf9] p-6 text-sm text-[#6f7d76]">No earlier wellness plans are available yet.</div>
+              <div className="mt-5 rounded-2xl border border-dashed border-[#cfd8cf] bg-[#f9fcf9] p-6 text-sm text-[#6f7d76]">No earlier check-ins are available yet.</div>
             )}
           </div>
         </section>
