@@ -1,9 +1,57 @@
 const { serviceSupabase } = require("../config/supabaseClient");
 const { selectPrimaryStressContext } = require("../utils/wellnessRisk");
-const Groq = require('groq');
+const Groq = require('groq-sdk');
 
-// Initialize the Groq client using env variables
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+let groq;
+
+function loadGroqClient() {
+  if (!process.env.GROQ_API_KEY) {
+    const error = new Error("GROQ_API_KEY is required for wellness analysis");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  if (!groq) {
+    groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  }
+
+  return groq;
+}
+
+function getRiskCategoryFromSwi(swiScore) {
+  if (swiScore < 40) return "low";
+  if (swiScore < 70) return "moderate";
+  return "high";
+}
+
+async function getAiResult(supabase, studentId, checkInId) {
+  const { data, error } = await supabase
+    .from("ai_results")
+    .select("*")
+    .eq("student_id", studentId)
+    .eq("check_in_id", checkInId)
+    .maybeSingle();
+
+  if (error) {
+    const serviceError = new Error("Unable to retrieve AI analysis");
+    serviceError.statusCode = 500;
+    throw serviceError;
+  }
+
+  return data || null;
+}
+
+async function storeAiResult(supabase, payload) {
+  const { data, error } = await supabase
+    .from('ai_results')
+    .upsert([payload], { onConflict: 'check_in_id' })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
+}
 
 async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_id }) {
   if (!serviceSupabase) {
@@ -12,6 +60,7 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
     throw error;
   }
 
+  const groqClient = loadGroqClient();
   const supabase = serviceSupabase;
   
   // FETCH RAW DATA FROM SUPABASE
@@ -20,12 +69,15 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
     .from('weekly_check_ins')
     .select('reflection, stress_level, burnout_level')
     .eq('id', check_in_id)
+    .eq('student_id', student_id)
     .single();
 
   const { data: scores, error: scoresErr } = await supabase
     .from('wellness_dimension_scores')
     .select('*')
     .eq('id', dimension_scores_id)
+    .eq('student_id', student_id)
+    .eq('check_in_id', check_in_id)
     .single();
 
   if (checkInErr || scoresErr) {
@@ -99,7 +151,7 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
     }`;
 
   // Execute high-speed inference on Groq using Llama-3.3-70b-versatile
-  const completion = await groq.chat.completions.create({
+  const completion = await groqClient.chat.completions.create({
     model: "llama-3.3-70b-versatile",
     messages: [
       { role: "system", content: systemPrompt },
@@ -118,35 +170,33 @@ async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_i
     Number(scores.role_load_score) + 
     Number(scores.course_environment_score);
   const calculatedSwi = Number((totalScoreSum / 5).toFixed(2));
+  const calculatedRiskCategory = getRiskCategoryFromSwi(calculatedSwi);
 
   // Ensure summary string is cleanly trimmed
   const cleanSummary = (aiPayload.weekly_summary || "").trim().substring(0, 4000);
 
-  // SAVE LIVE DATA OBJECT TO DB
-  const { data: insertedResult, error: dbError } = await supabase
-    .from('ai_results')
-    .insert([{
-      student_id,
-      check_in_id,
-      dimension_scores_id,
-      swi_score: calculatedSwi,                        
-      risk_category: aiPayload.risk_category,         
-      stress_severity_level: aiPayload.stress_severity_level, 
-      primary_stress_context: aiPayload.primary_stress_context, 
-      reflection_keywords: aiPayload.reflection_keywords || [], 
-      weekly_summary: cleanSummary,                    
-      recommendations: aiPayload.recommendations || [],
-      analysis_method: 'rag_assisted',               
-      analysis_version: '1.0'    
-    }])
-    .select()
-    .single();
+  const storedResult = await storeAiResult(supabase, {
+    student_id,
+    check_in_id,
+    dimension_scores_id,
+    swi_score: calculatedSwi,
+    risk_category: calculatedRiskCategory,
+    stress_severity_level: aiPayload.stress_severity_level,
+    primary_stress_context: aiPayload.primary_stress_context,
+    reflection_keywords: aiPayload.reflection_keywords || [],
+    weekly_summary: cleanSummary,
+    recommendations: aiPayload.recommendations || [],
+    analysis_method: 'rag_assisted',
+    analysis_version: '1.0'
+  });
 
-  if (dbError) throw dbError;
-
-  return insertedResult;
+  return storedResult;
 }
 
 module.exports = {
-  runWellnessPipeline
+  getAiResult,
+  getRiskCategoryFromSwi,
+  loadGroqClient,
+  runWellnessPipeline,
+  storeAiResult
 };

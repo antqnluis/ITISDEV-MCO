@@ -9,6 +9,10 @@ import { listAllAcademicRecords } from "../services/academicRecordApi";
 import { listAllCalendarEvents } from "../services/calendarEventApi";
 import { listWeeklyCheckIns } from "../services/weeklyCheckInApi";
 import { listAllWellnessDimensionScores } from "../services/wellnessDimensionScoreApi";
+import {
+  getStudentWellnessIndex,
+  getSwiConcernStatus,
+} from "../utils/wellnessScore";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -50,31 +54,6 @@ function getDashboardEventRange() {
   const to = new Date(from);
   to.setFullYear(to.getFullYear() + 1);
   return { from: from.toISOString(), to: to.toISOString() };
-}
-
-function getWellnessStatus(score) {
-  if (!Number.isFinite(score)) return { label: "Pending", tone: "" };
-  if (score >= 80) return { label: "Thriving", tone: "Excellent" };
-  if (score >= 65) return { label: "Steady", tone: "Stable" };
-  if (score >= 45) return { label: "Needs support", tone: "Watch" };
-  return { label: "At risk", tone: "Urgent" };
-}
-
-function getWellnessIndex(checkIn) {
-  if (!checkIn) return null;
-
-  const ratings = [
-    6 - checkIn.stress_level,
-    checkIn.mood_level,
-    checkIn.sleep_quality,
-    checkIn.motivation_level,
-    6 - checkIn.burnout_level,
-    checkIn.energy_level,
-  ].filter(Number.isFinite);
-
-  return ratings.length
-    ? Math.round((ratings.reduce((total, value) => total + value, 0) / (ratings.length * 5)) * 100)
-    : null;
 }
 
 function getMetricBadge(value) {
@@ -150,9 +129,9 @@ function Dashboard() {
     return dimensionScores.find((score) => score.check_in_id === latestCheckIn.id) || null;
   }, [dimensionScores, latestCheckIn]);
 
-  const wellnessScore = getWellnessIndex(latestCheckIn);
+  const wellnessScore = getStudentWellnessIndex(latestScore);
 
-  const wellnessStatus = getWellnessStatus(wellnessScore);
+  const wellnessStatus = getSwiConcernStatus(wellnessScore);
 
   const wellnessMetrics = latestCheckIn
     ? [
@@ -343,12 +322,12 @@ function Dashboard() {
           score={wellnessScore ?? "—"}
           status={wellnessStatus.label}
           title={wellnessScore === null
-            ? "Complete a weekly check-in to calculate your wellness index."
-            : `Your student wellness index is ${wellnessScore}/100.`}
+            ? "Your student wellness index is pending."
+            : `Your student wellness index (concern) is ${wellnessScore}/100.`}
           description={
-            latestCheckIn?.reflection
-              ? `${latestCheckIn.reflection} ${wellnessStatus.tone} overall.`
-              : "Your dashboard will fill in with more insights as you add weekly check-ins."
+            wellnessScore === null
+              ? wellnessStatus.tone
+              : `Higher scores indicate greater concern. ${wellnessStatus.tone}`
           }
         />
 

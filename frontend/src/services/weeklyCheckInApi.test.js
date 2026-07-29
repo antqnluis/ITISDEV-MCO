@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  analyzeWeeklyCheckIn,
   calculateWellnessDimensions,
   createWeeklyCheckIn,
   getCurrentWeeklyCheckIn,
+  getWeeklyAnalysis,
   listWeeklyCheckIns,
   updateWeeklyCheckIn,
 } from "./weeklyCheckInApi";
@@ -62,6 +64,49 @@ describe("weeklyCheckInApi", () => {
       3,
       "/api/check-ins/check-in-1/calculate-dimensions",
       { method: "POST" },
+    );
+  });
+
+  it("loads and creates an AI analysis through authenticated requests", async () => {
+    const savedAnalysis = {
+      id: "analysis-1",
+      check_in_id: "check-in-1",
+      swi_score: 70.19,
+    };
+    const authenticatedRequest = vi.fn()
+      .mockResolvedValueOnce({ success: true, aiResult: savedAnalysis })
+      .mockResolvedValueOnce({ success: true, data: savedAnalysis })
+      .mockResolvedValueOnce({ success: true, aiResult: null });
+
+    await expect(
+      getWeeklyAnalysis(authenticatedRequest, "check-in-1"),
+    ).resolves.toEqual(savedAnalysis);
+    await expect(
+      analyzeWeeklyCheckIn(
+        authenticatedRequest,
+        "check-in-1",
+        "dimension-score-1",
+      ),
+    ).resolves.toEqual(savedAnalysis);
+    await expect(
+      getWeeklyAnalysis(authenticatedRequest, "check-in-2"),
+    ).resolves.toBeNull();
+
+    expect(authenticatedRequest).toHaveBeenNthCalledWith(
+      1,
+      "/api/check-ins/check-in-1/analysis",
+    );
+    expect(authenticatedRequest).toHaveBeenNthCalledWith(
+      2,
+      "/api/check-ins/check-in-1/analyze",
+      {
+        method: "POST",
+        body: { dimension_scores_id: "dimension-score-1" },
+      },
+    );
+    expect(authenticatedRequest).toHaveBeenNthCalledWith(
+      3,
+      "/api/check-ins/check-in-2/analysis",
     );
   });
 });

@@ -4,7 +4,7 @@ const alertContent = {
   severe: {
     eyebrow: "Additional support recommended",
     title: "Consider connecting with someone soon",
-    description: "This mock result shows severe stress. Reaching out early can help you make the next steps more manageable.",
+    description: "Your current AI analysis indicates severe stress. Reaching out early can help you make the next steps more manageable.",
     contacts: [
       "DLSU Counseling and Psychological Services",
       "An academic adviser or the Office of Student Affairs",
@@ -21,7 +21,7 @@ const alertContent = {
   critical: {
     eyebrow: "Immediate support recommended",
     title: "Please connect with support now",
-    description: "This mock result shows a critical level of concern. Contact DLSU Counseling and Psychological Services or someone you trust immediately. If you believe you are in immediate danger, contact local emergency services.",
+    description: "Your current AI analysis indicates a critical level of concern. Contact DLSU Counseling and Psychological Services or someone you trust immediately. If you believe you are in immediate danger, contact local emergency services.",
     contacts: [
       "DLSU Counseling and Psychological Services",
       "A trusted person who can stay with you",

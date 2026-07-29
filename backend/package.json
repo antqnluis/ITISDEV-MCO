@@ -10,6 +10,7 @@
     "test:logistical-seed": "node scripts/testSeededLogisticalLoad.js",
     "test:role-seed": "node scripts/testSeededRoleLoad.js",
     "test:wellbeing-seed": "node scripts/testSeededPersonalWellbeing.js",
+    "test:groq-live": "node scripts/testGroqWellnessAnalysis.js",
     "seed:demo": "node scripts/seedDemoStudent.js",
     "dev": "nodemon server.js",
     "start": "node server.js"
@@ -22,7 +23,8 @@
     "@supabase/supabase-js": "^2.110.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "groq-sdk": "^1.4.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
