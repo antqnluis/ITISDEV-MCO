@@ -50,7 +50,13 @@ export function logoutAccount(token) {
   });
 }
 
+export function resolvePostConsentDestination(student, fallback = "/dashboard") {
+  if (student?.onboarding_completed === false) return "/onboarding";
+  if (student?.onboarding_completed === true) return "/dashboard";
+  return fallback === "/onboarding" ? "/onboarding" : "/dashboard";
+}
+
 export function resolveAccountDestination(student, postConsentDestination = "/dashboard") {
   if (!hasCurrentConsent(student)) return "/consent";
-  return postConsentDestination === "/onboarding" ? "/onboarding" : "/dashboard";
+  return resolvePostConsentDestination(student, postConsentDestination);
 }

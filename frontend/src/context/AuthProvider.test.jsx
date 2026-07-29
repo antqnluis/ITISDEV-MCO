@@ -33,6 +33,35 @@ function CompletionProbe() {
   return <button type="button" onClick={complete}>{result || "complete onboarding"}</button>;
 }
 
+function LoginProbe() {
+  const { login } = useAuth();
+  const [result, setResult] = useState("");
+
+  async function signIn() {
+    try {
+      setResult(await login({
+        email: "student@example.com",
+        password: "password",
+      }));
+    } catch (error) {
+      setResult(error.message);
+    }
+  }
+
+  return <button type="button" onClick={signIn}>{result || "sign in"}</button>;
+}
+
+function ConsentProbe() {
+  const { acceptConsent } = useAuth();
+  const [result, setResult] = useState("");
+
+  async function accept() {
+    setResult(await acceptConsent());
+  }
+
+  return <button type="button" onClick={accept}>{result || "accept consent"}</button>;
+}
+
 function AuthenticatedRequestProbe() {
   const { authenticatedRequest } = useAuth();
   const [result, setResult] = useState("");
@@ -81,6 +110,7 @@ const storedAccount = {
     last_name: "Student",
     consent_given: true,
     privacy_notice_version: "v1.0",
+    onboarding_completed: true,
   },
 };
 
@@ -121,6 +151,7 @@ describe("AuthProvider hydration", () => {
       ...storedAccount.student,
       consent_given: false,
       privacy_notice_version: null,
+      onboarding_completed: false,
     };
     writeStoredAuth({
       ...storedAccount,
@@ -141,17 +172,90 @@ describe("AuthProvider hydration", () => {
   it("restores a consented but unfinished registration to onboarding", async () => {
     writeStoredAuth({
       ...storedAccount,
+      student: {
+        ...storedAccount.student,
+        onboarding_completed: false,
+      },
       postConsentDestination: "/onboarding",
     });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
       success: true,
       user: storedAccount.user,
-      student: { ...storedAccount.student, first_name: "Jamie" },
+      student: {
+        ...storedAccount.student,
+        first_name: "Jamie",
+        onboarding_completed: false,
+      },
     })));
 
     render(<AuthProvider><Probe /></AuthProvider>);
 
     expect(await screen.findByText("authenticated:/onboarding:/onboarding:Jamie")).toBeInTheDocument();
+  });
+
+  it("routes a fresh login without a profile to onboarding", async () => {
+    const user = userEvent.setup();
+    const incompleteStudent = {
+      ...storedAccount.student,
+      onboarding_completed: false,
+    };
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        user: storedAccount.user,
+        session: storedAccount.session,
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        user: storedAccount.user,
+        student: incompleteStudent,
+      })));
+
+    render(<AuthProvider><Probe /><LoginProbe /></AuthProvider>);
+    await user.click(screen.getByRole("button", { name: "sign in" }));
+
+    expect(await screen.findByText("authenticated:/onboarding:/onboarding:Cached"))
+      .toBeInTheDocument();
+    expect(JSON.parse(window.sessionStorage.getItem("animolog.auth.session.v1")))
+      .toMatchObject({
+        student: { onboarding_completed: false },
+        postConsentDestination: "/onboarding",
+      });
+  });
+
+  it("routes an unfinished student to onboarding after accepting updated consent", async () => {
+    const user = userEvent.setup();
+    const incompleteStudent = {
+      ...storedAccount.student,
+      consent_given: true,
+      privacy_notice_version: "v0.9",
+      onboarding_completed: false,
+    };
+    writeStoredAuth({
+      ...storedAccount,
+      student: incompleteStudent,
+      postConsentDestination: "/dashboard",
+    });
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        user: storedAccount.user,
+        student: incompleteStudent,
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        success: true,
+        student: {
+          ...incompleteStudent,
+          privacy_notice_version: "v1.0",
+        },
+      })));
+
+    render(<AuthProvider><Probe /><ConsentProbe /></AuthProvider>);
+    await screen.findByText("authenticated:/consent:/onboarding:Cached");
+    await user.click(screen.getByRole("button", { name: "accept consent" }));
+
+    expect(await screen.findByText("authenticated:/onboarding:/onboarding:Cached"))
+      .toBeInTheDocument();
   });
 
   it("uses cached identity during a temporary network outage", async () => {
@@ -170,13 +274,20 @@ describe("AuthProvider hydration", () => {
     const user = userEvent.setup();
     writeStoredAuth({
       ...storedAccount,
+      student: {
+        ...storedAccount.student,
+        onboarding_completed: false,
+      },
       postConsentDestination: "/onboarding",
     });
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse({
         success: true,
         user: storedAccount.user,
-        student: storedAccount.student,
+        student: {
+          ...storedAccount.student,
+          onboarding_completed: false,
+        },
       }))
       .mockResolvedValueOnce(jsonResponse(response, status));
     vi.stubGlobal("fetch", fetchMock);
@@ -196,13 +307,20 @@ describe("AuthProvider hydration", () => {
     const user = userEvent.setup();
     writeStoredAuth({
       ...storedAccount,
+      student: {
+        ...storedAccount.student,
+        onboarding_completed: false,
+      },
       postConsentDestination: "/onboarding",
     });
     vi.stubGlobal("fetch", vi.fn()
       .mockResolvedValueOnce(jsonResponse({
         success: true,
         user: storedAccount.user,
-        student: storedAccount.student,
+        student: {
+          ...storedAccount.student,
+          onboarding_completed: false,
+        },
       }))
       .mockResolvedValueOnce(jsonResponse({ message: "Invalid or expired access token" }, 401)));
 

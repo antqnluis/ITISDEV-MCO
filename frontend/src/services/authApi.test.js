@@ -3,6 +3,7 @@ import {
   loginAccount,
   registerAccount,
   resolveAccountDestination,
+  resolvePostConsentDestination,
   submitConsent,
 } from "./authApi";
 
@@ -62,7 +63,19 @@ describe("auth API", () => {
     expect(resolveAccountDestination({
       consent_given: true,
       privacy_notice_version: "v1.0",
+      onboarding_completed: true,
     })).toBe("/dashboard");
+    expect(resolveAccountDestination({
+      consent_given: true,
+      privacy_notice_version: "v1.0",
+      onboarding_completed: false,
+    })).toBe("/onboarding");
+    expect(resolvePostConsentDestination({
+      onboarding_completed: true,
+    }, "/onboarding")).toBe("/dashboard");
+    expect(resolvePostConsentDestination({
+      onboarding_completed: false,
+    }, "/dashboard")).toBe("/onboarding");
     expect(resolveAccountDestination({
       consent_given: true,
       privacy_notice_version: "v1.0",

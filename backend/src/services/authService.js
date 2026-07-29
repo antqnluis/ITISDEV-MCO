@@ -1,5 +1,6 @@
 const {
     publicSupabase,
+    serviceSupabase,
     createAuthenticatedSupabaseClient,
     signOutSession
 } = require("../config/supabaseClient");
@@ -102,6 +103,33 @@ function toUser(user) {
     };
 }
 
+function getRegistrationAdmin() {
+    const admin = serviceSupabase?.auth?.admin;
+
+    if (!admin || typeof admin.deleteUser !== "function") {
+        throw createServiceError(
+            "Registration requires SUPABASE_SERVICE_ROLE_KEY to be configured",
+            503
+        );
+    }
+
+    return admin;
+}
+
+async function removeIncompleteAuthUser(admin, userId) {
+    try {
+        const { error } = await admin.deleteUser(userId);
+        if (error) {
+            throw error;
+        }
+    } catch {
+        throw createServiceError(
+            "Registration failed and the incomplete account could not be removed",
+            500
+        );
+    }
+}
+
 async function registerStudent({ email, password, student_number, first_name, last_name } = {}) {
     const normalizedEmail = getRequiredString(email, "email").toLowerCase();
     const normalizedPassword = getRequiredString(password, "password");
@@ -113,6 +141,7 @@ async function registerStudent({ email, password, student_number, first_name, la
         throw createServiceError("student_number must be between 4 and 30 characters", 400);
     }
 
+    const registrationAdmin = getRegistrationAdmin();
     const { data: authData, error: authError } = await publicSupabase.auth.signUp({
         email: normalizedEmail,
         password: normalizedPassword
@@ -126,39 +155,47 @@ async function registerStudent({ email, password, student_number, first_name, la
         throw createServiceError("User registration did not return an auth user", 400);
     }
 
-    const session = toSession(
-        authData.session,
-        "Registration requires Supabase email confirmation to be disabled."
-    );
-    const studentSupabase = createAuthenticatedSupabaseClient(session.access_token);
+    try {
+        const session = toSession(
+            authData.session,
+            "Registration requires Supabase email confirmation to be disabled."
+        );
+        const studentSupabase = createAuthenticatedSupabaseClient(session.access_token);
 
-    const { data: student, error: studentError } = await studentSupabase
-        .from("students")
-        .insert({
-            id: authData.user.id,
-            student_number: normalizedStudentNumber,
-            first_name: normalizedFirstName,
-            last_name: normalizedLastName
-        })
-        .select(STUDENT_SELECT)
-        .single();
+        const { data: student, error: studentError } = await studentSupabase
+            .from("students")
+            .insert({
+                id: authData.user.id,
+                student_number: normalizedStudentNumber,
+                first_name: normalizedFirstName,
+                last_name: normalizedLastName
+            })
+            .select(STUDENT_SELECT)
+            .single();
 
-    if (studentError) {
-        if (studentError.code === "23505") {
-            throw createServiceError("student_number is already registered", 409);
+        if (studentError) {
+            if (studentError.code === "23505") {
+                throw createServiceError("student_number is already registered", 409);
+            }
+
+            throw createServiceError(
+                "Registration could not create the student record",
+                500
+            );
         }
 
-        throw createServiceError(
-            "Registration could not create the student record",
-            500
-        );
+        return {
+            user: toUser(authData.user),
+            session,
+            student: {
+                ...student,
+                onboarding_completed: false
+            }
+        };
+    } catch (error) {
+        await removeIncompleteAuthUser(registrationAdmin, authData.user.id);
+        throw error;
     }
-
-    return {
-        user: toUser(authData.user),
-        session,
-        student
-    };
 }
 
 async function loginStudent({ email, password } = {}) {
@@ -195,7 +232,20 @@ async function getCurrentStudent(supabase, userId) {
         throw createServiceError("Student record not found", 404);
     }
 
-    return data;
+    const { data: profile, error: profileError } = await supabase
+        .from("student_profiles")
+        .select("onboarding_completed_at")
+        .eq("student_id", userId)
+        .maybeSingle();
+
+    if (profileError) {
+        throw createServiceError("Unable to retrieve the current student", 500);
+    }
+
+    return {
+        ...data,
+        onboarding_completed: Boolean(profile?.onboarding_completed_at)
+    };
 }
 
 async function updateCurrentStudent(supabase, userId, payload) {

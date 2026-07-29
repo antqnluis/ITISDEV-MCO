@@ -15,6 +15,7 @@ function authValue(overrides = {}) {
       last_name: "Reyes",
       consent_given: true,
       privacy_notice_version: "v1.0",
+      onboarding_completed: true,
     },
     acceptConsent: vi.fn(),
     completeOnboarding: vi.fn(),
@@ -88,7 +89,13 @@ describe("authentication route guards", () => {
   });
 
   it("keeps a mounted onboarding flow visible when completion state changes", () => {
-    const pendingValue = authValue({ postConsentDestination: "/onboarding" });
+    const pendingValue = authValue({
+      postConsentDestination: "/dashboard",
+      student: {
+        ...authValue().student,
+        onboarding_completed: false,
+      },
+    });
     const route = (
       <MemoryRouter initialEntries={["/onboarding"]}>
         <Routes>

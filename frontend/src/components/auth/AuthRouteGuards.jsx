@@ -1,6 +1,9 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { hasCurrentConsent } from "../../services/authApi";
+import {
+  hasCurrentConsent,
+  resolvePostConsentDestination,
+} from "../../services/authApi";
 import { useAuth } from "../../context/useAuth";
 
 function LoadingScreen() {
@@ -41,9 +44,9 @@ export function RequireAuth({ children, requireConsent = false }) {
 }
 
 export function OnboardingOnlyRoute({ children }) {
-  const { postConsentDestination } = useAuth();
+  const { postConsentDestination, student } = useAuth();
   const [wasOnboardingPending] = useState(() => (
-    postConsentDestination === "/onboarding"
+    resolvePostConsentDestination(student, postConsentDestination) === "/onboarding"
   ));
 
   if (!wasOnboardingPending) {

@@ -64,7 +64,7 @@
    cp .env.example .env
    ```
 
-   Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `backend/.env`. The anon key is used for authentication and all student-scoped requests so Supabase row-level security applies. Set the server-only `SUPABASE_SERVICE_ROLE_KEY` for trusted operations such as wellness-dimension calculation and academic-record imports; never expose it to clients.
+   Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in `backend/.env`. The anon key is used for authentication and all student-scoped requests so Supabase row-level security applies. The server-only service-role key is required to safely roll back incomplete registrations and for trusted operations such as wellness-dimension calculation and academic-record imports; never expose it to clients.
 
    The server uses port `9999` by default. To change it, add `PORT=your_port` to `backend/.env`.
 

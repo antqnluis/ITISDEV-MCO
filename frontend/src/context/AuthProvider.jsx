@@ -5,6 +5,7 @@ import {
   logoutAccount,
   registerAccount,
   resolveAccountDestination,
+  resolvePostConsentDestination,
   submitConsent,
   updateCurrentAccount,
 } from "../services/authApi";
@@ -74,9 +75,13 @@ export function AuthProvider({ children }) {
     async function hydrateAuthentication() {
       try {
         const current = await getCurrentAccount(storedAuth.session.access_token);
-        const destination = resolveAccountDestination(
+        const postConsentDestination = resolvePostConsentDestination(
           current.student,
           storedAuth.postConsentDestination,
+        );
+        const destination = resolveAccountDestination(
+          current.student,
+          postConsentDestination,
         );
 
         if (!cancelled) {
@@ -84,7 +89,7 @@ export function AuthProvider({ children }) {
             session: storedAuth.session,
             student: current.student,
             user: current.user,
-            postConsentDestination: storedAuth.postConsentDestination,
+            postConsentDestination,
           }, destination);
         }
       } catch (error) {
@@ -154,13 +159,14 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (credentials) => {
     const authenticated = await loginAccount(credentials);
     const current = await getCurrentAccount(authenticated.session.access_token);
-    const destination = resolveAccountDestination(current.student);
+    const postConsentDestination = resolvePostConsentDestination(current.student);
+    const destination = resolveAccountDestination(current.student, postConsentDestination);
 
     commitAuthentication({
       session: authenticated.session,
       student: current.student,
       user: current.user,
-      postConsentDestination: "/dashboard",
+      postConsentDestination,
     }, destination);
 
     return destination;
@@ -185,12 +191,16 @@ export function AuthProvider({ children }) {
     try {
       const result = await submitConsent(token);
       const nextStudent = { ...authState.student, ...result.student };
-      const destination = authState.postConsentDestination;
+      const postConsentDestination = resolvePostConsentDestination(
+        nextStudent,
+        authState.postConsentDestination,
+      );
+      const destination = resolveAccountDestination(nextStudent, postConsentDestination);
       commitAuthentication({
         session: sessionRef.current,
         student: nextStudent,
         user: authState.user,
-        postConsentDestination: destination,
+        postConsentDestination,
       }, destination);
       return destination;
     } catch (error) {
@@ -251,9 +261,13 @@ export function AuthProvider({ children }) {
       }
     }
 
+    const nextStudent = {
+      ...authState.student,
+      onboarding_completed: true,
+    };
     commitAuthentication({
       session: sessionRef.current,
-      student: authState.student,
+      student: nextStudent,
       user: authState.user,
       postConsentDestination: "/dashboard",
     }, "/dashboard");
