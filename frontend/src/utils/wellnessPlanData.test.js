@@ -1,7 +1,9 @@
 import { describe, expect, test } from "vitest";
 import {
   buildWellnessPlanData,
+  WELLNESS_PLAN_CRITICAL_DEMO_INPUT,
   WELLNESS_PLAN_DEMO_INPUT,
+  WELLNESS_PLAN_SEVERE_DEMO_INPUT,
 } from "./wellnessPlanData.js";
 
 const dimensionFields = {
@@ -128,5 +130,30 @@ describe("buildWellnessPlanData", () => {
     expect(plan.priorities).toHaveLength(3);
     expect(plan.actions).toHaveLength(3);
     expect(plan.checkInHistory).toHaveLength(1);
+  });
+
+  test("supports explicit severe and critical frontend demo fixtures", () => {
+    const severePlan = buildWellnessPlanData(WELLNESS_PLAN_SEVERE_DEMO_INPUT);
+    const criticalPlan = buildWellnessPlanData(WELLNESS_PLAN_CRITICAL_DEMO_INPUT);
+
+    expect(WELLNESS_PLAN_DEMO_INPUT).toBe(WELLNESS_PLAN_SEVERE_DEMO_INPUT);
+    expect(severePlan.stressSeverityLevel).toBe("severe");
+    expect(criticalPlan.stressSeverityLevel).toBe("critical");
+    expect(criticalPlan.riskCategory).toBe("high");
+  });
+
+  test("ignores unsupported demo severity overrides", () => {
+    const plan = buildWellnessPlanData({
+      demoSeverity: "unsupported",
+      latestScore: {
+        academic_engagement_score: 10,
+        personal_wellbeing_score: 20,
+        logistical_load_score: 15,
+        role_load_score: 5,
+        course_environment_score: 0,
+      },
+    });
+
+    expect(plan.stressSeverityLevel).toBe("low_normal");
   });
 });

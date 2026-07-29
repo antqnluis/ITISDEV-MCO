@@ -51,7 +51,8 @@ const DIMENSION_DEFINITIONS = [
   },
 ];
 
-export const WELLNESS_PLAN_DEMO_INPUT = {
+export const WELLNESS_PLAN_SEVERE_DEMO_INPUT = {
+  demoSeverity: "severe",
   student: {
     first_name: "Pauline",
     last_name: "Reyes",
@@ -89,6 +90,27 @@ export const WELLNESS_PLAN_DEMO_INPUT = {
     },
   ],
 };
+
+export const WELLNESS_PLAN_CRITICAL_DEMO_INPUT = {
+  ...WELLNESS_PLAN_SEVERE_DEMO_INPUT,
+  demoSeverity: "critical",
+  latestCheckIn: {
+    ...WELLNESS_PLAN_SEVERE_DEMO_INPUT.latestCheckIn,
+    id: "demo-check-in-critical",
+    reflection: "This frontend-only fixture previews the critical support state.",
+  },
+  latestScore: {
+    ...WELLNESS_PLAN_SEVERE_DEMO_INPUT.latestScore,
+    check_in_id: "demo-check-in-critical",
+    academic_engagement_score: 98,
+    personal_wellbeing_score: 96,
+    logistical_load_score: 92,
+    role_load_score: 95,
+    course_environment_score: 90,
+  },
+};
+
+export const WELLNESS_PLAN_DEMO_INPUT = WELLNESS_PLAN_SEVERE_DEMO_INPUT;
 
 function formatWeekLabel(weekStart) {
   if (!weekStart) return "Week unavailable";
@@ -225,6 +247,7 @@ function getSupportResources() {
 }
 
 export function buildWellnessPlanData({
+  demoSeverity,
   student,
   profile,
   latestCheckIn,
@@ -235,6 +258,9 @@ export function buildWellnessPlanData({
   const concernIndex = getConcernIndex(dimensions);
   const riskCategory = getRiskCategory(concernIndex);
   const primaryContext = getPrimaryContext(dimensions);
+  const stressSeverityLevel = demoSeverity === "severe" || demoSeverity === "critical"
+    ? demoSeverity
+    : getSeverity(concernIndex);
 
   return {
     weekCovered: formatWeekLabel(latestCheckIn?.week_start),
@@ -245,7 +271,7 @@ export function buildWellnessPlanData({
     college: profile?.college || "Your college",
     studentWellnessIndex: concernIndex,
     riskCategory,
-    stressSeverityLevel: getSeverity(concernIndex),
+    stressSeverityLevel,
     primaryStressContext: primaryContext,
     currentCondition: latestCheckIn?.reflection
       || "No written reflection was provided for this check-in.",

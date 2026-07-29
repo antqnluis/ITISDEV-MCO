@@ -1,12 +1,19 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AppShell from "../components/layout/AppShell";
+import WellnessSupportAlert from "../components/wellness-plan/WellnessSupportAlert";
 import DashboardPageHeader from "../components/ui/DashboardPageHeader";
 import AppIcon from "../components/ui/AppIcon";
 import {
   buildWellnessPlanData,
-  WELLNESS_PLAN_DEMO_INPUT,
+  WELLNESS_PLAN_CRITICAL_DEMO_INPUT,
+  WELLNESS_PLAN_SEVERE_DEMO_INPUT,
 } from "../utils/wellnessPlanData";
+
+const demoScenarios = {
+  severe: WELLNESS_PLAN_SEVERE_DEMO_INPUT,
+  critical: WELLNESS_PLAN_CRITICAL_DEMO_INPUT,
+};
 
 const severityLabels = {
   low_normal: "Low/normal",
@@ -40,9 +47,10 @@ function getConcernBarClass(score) {
 }
 
 function WellnessPlan() {
+  const [demoScenario, setDemoScenario] = useState("severe");
   const plan = useMemo(
-    () => buildWellnessPlanData(WELLNESS_PLAN_DEMO_INPUT),
-    [],
+    () => buildWellnessPlanData(demoScenarios[demoScenario]),
+    [demoScenario],
   );
 
   return (
@@ -60,6 +68,31 @@ function WellnessPlan() {
       />
 
       <div className="space-y-6">
+        <section aria-label="Demo scenario controls" className="flex flex-col gap-4 rounded-[20px] border border-[#dce5de] bg-[#f9fcf9] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[#29483b]">Frontend-only demo scenario</p>
+            <p className="mt-1 text-xs leading-5 text-[#6a7d73]">Switch between mock severity states. No backend analysis or student data is being loaded.</p>
+          </div>
+          <div role="group" aria-label="Select demo severity" className="inline-flex self-start rounded-xl border border-[#d5dfd7] bg-white p-1 sm:self-auto">
+            {Object.keys(demoScenarios).map((scenario) => {
+              const selected = demoScenario === scenario;
+              return (
+                <button
+                  key={scenario}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setDemoScenario(scenario)}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition focus-visible:outline-2 focus-visible:outline-[#4b8360] ${selected ? "bg-[#3f7854] text-white" : "text-[#5d7167] hover:bg-[#f0f5f1]"}`}
+                >
+                  {scenario}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <WellnessSupportAlert severity={plan.stressSeverityLevel} />
+
         <section className="rounded-[24px] border border-[#e1e8e1] bg-white p-6 shadow-[0_8px_24px_rgba(22,51,40,0.04)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -162,7 +195,7 @@ function WellnessPlan() {
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[24px] border border-[#e1e8e1] bg-white p-6 shadow-[0_8px_24px_rgba(22,51,40,0.04)]">
+          <div id="support-resources" className="scroll-mt-24 rounded-[24px] border border-[#e1e8e1] bg-white p-6 shadow-[0_8px_24px_rgba(22,51,40,0.04)]">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#789087]">Support resources</p>
             <h2 className="mt-1 font-serif text-xl font-semibold text-[#173e30]">Resources for elevated needs</h2>
             <ul className="mt-5 space-y-3">
