@@ -1,34 +1,91 @@
 const { serviceSupabase } = require("../config/supabaseClient");
 const { selectPrimaryStressContext } = require("../utils/wellnessRisk");
+const Groq = require('groq-sdk');
 
-async function runMockWellnessPipeline({ student_id, check_in_id, dimension_scores_id }) {
+let groq;
+
+function loadGroqClient() {
+  if (!process.env.GROQ_API_KEY) {
+    const error = new Error("GROQ_API_KEY is required for wellness analysis");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  if (!groq) {
+    groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  }
+
+  return groq;
+}
+
+function getRiskCategoryFromSwi(swiScore) {
+  if (swiScore < 40) return "low";
+  if (swiScore < 70) return "moderate";
+  return "high";
+}
+
+async function getAiResult(supabase, studentId, checkInId) {
+  const { data, error } = await supabase
+    .from("ai_results")
+    .select("*")
+    .eq("student_id", studentId)
+    .eq("check_in_id", checkInId)
+    .maybeSingle();
+
+  if (error) {
+    const serviceError = new Error("Unable to retrieve AI analysis");
+    serviceError.statusCode = 500;
+    throw serviceError;
+  }
+
+  return data || null;
+}
+
+async function storeAiResult(supabase, payload) {
+  const { data, error } = await supabase
+    .from('ai_results')
+    .upsert([payload], { onConflict: 'check_in_id' })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
+}
+
+async function runWellnessPipeline({ student_id, check_in_id, dimension_scores_id }) {
   if (!serviceSupabase) {
     const error = new Error("SUPABASE_SERVICE_ROLE_KEY is required for wellness analysis");
     error.statusCode = 503;
     throw error;
   }
 
+  const groqClient = loadGroqClient();
   const supabase = serviceSupabase;
   
   // FETCH RAW DATA FROM SUPABASE
+
   const { data: checkIn, error: checkInErr } = await supabase
     .from('weekly_check_ins')
     .select('reflection, stress_level, burnout_level')
     .eq('id', check_in_id)
+    .eq('student_id', student_id)
     .single();
 
   const { data: scores, error: scoresErr } = await supabase
     .from('wellness_dimension_scores')
     .select('*')
     .eq('id', dimension_scores_id)
+    .eq('student_id', student_id)
+    .eq('check_in_id', check_in_id)
     .single();
 
   if (checkInErr || scoresErr) {
     throw new Error(`Database record retrieval failed: ${checkInErr?.message || scoresErr?.message}`);
   }
 
-  // DETERMINISTIC LOGIC (Find Primary Stress Context)
-  // Dimension scores represent concern: 0 is low concern and 100 is high concern.
+  // DETERMINISTIC LOGIC (Primary Context Extraction)
+  
   const dimensionScores = [
     { name: 'academic_engagement', score: Number(scores.academic_engagement_score) },
     { name: 'personal_wellbeing', score: Number(scores.personal_wellbeing_score) },
@@ -37,92 +94,109 @@ async function runMockWellnessPipeline({ student_id, check_in_id, dimension_scor
     { name: 'course_environment', score: Number(scores.course_environment_score) }
   ];
 
+  // 0 (Best condition), 100 (Worst condition) 
   const contextSelection = selectPrimaryStressContext(dimensionScores);
-  const dimensions = contextSelection.orderedDimensions;
   let primaryContext = contextSelection.primaryContext;
 
-  // MOCK RETRIEVAL (SQL Category Filtering instead of Vectors)
+  // KNOWLEDGE RETRIEVAL (SQL Category Filtering)
+  
+  const targetCategory = primaryContext === 'mixed' ? 'personal_wellbeing' : primaryContext;
   const { data: resources } = await supabase
     .from('wellness_knowledge_base')
     .select('title, content')
-    .eq('category', primaryContext === 'mixed' ? 'personal_wellbeing' : primaryContext)
+    .eq('category', targetCategory)
     .limit(1);
 
   const supportText = resources && resources.length > 0 
     ? `Referenced Campus Advice [${resources[0].title}]: ${resources[0].content}`
     : "Standard wellness tracking active.";
 
-  // GENERATIVE TEXT SIMULATION & CRISIS DETECTION
-  let riskCategory = "low";
-  let severityLevel = "low_normal";
-  let recommendations = [
-    "Review your scheduled study blocks in your student dashboard calendar.",
-    "Ensure you prioritize physical sleep hygiene during high-workload weeks."
-  ];
+  // LIVE AI PIPELINE & REFLECTION INJECTION
 
-  // Map high scores to standard categories
-  if (checkIn.stress_level >= 4 || checkIn.burnout_level >= 4) {
-    riskCategory = "high";
-    severityLevel = "severe";
-    recommendations.push(`Consult the localized guide: "${resources?.[0]?.title || 'Campus Wellness Channels'}"`);
-  } else if (checkIn.stress_level === 3) {
-    riskCategory = "moderate";
-    severityLevel = "moderate";
-  }
+  const systemPrompt = `You are a private personal informatics wellness analyzer for De La Salle University (DLSU) students. 
+    Analyze the student's metrics, their raw written reflection, and relevant support materials to generate an assessment.
 
-  // Extract lowercase tracking keywords from text reflection
-  const reflectionText = checkIn.reflection || "";
-  const words = reflectionText.toLowerCase().split(/\W+/);
-  const reflectionKeywords = words.filter(w => ['groupmate', 'exam', 'tired', 'stress', 'commute', 'study', 'fail'].includes(w)).slice(0, 4);
-  if (reflectionKeywords.length === 0) reflectionKeywords.push("routine_tracking");
+    CRITICAL SCORING RULE INTERPRETATION:
+    For all metrics, 0 is the lowest concern (perfect condition) and 100 is the highest concern (worst condition). The HIGHER a score gets, the WORSE the student's state is. High scores near 100 indicate extreme strain.
 
-  // CRITICAL ESCALATION RULE OVERRIDE
-  const crisisKeywords = ["self-harm", "hopeless", "give up", "crisis", "suicide", "end my life"];
-  const containsCrisis = crisisKeywords.some(keyword => reflectionText.toLowerCase().includes(keyword));
+    STUDENT METRICS FOR THIS WEEK:
+    - Academic Engagement Score: ${scores.academic_engagement_score}/100
+    - Personal Wellbeing Score: ${scores.personal_wellbeing_score}/100
+    - Logistical Load Score: ${scores.logistical_load_score}/100
+    - Role Load Score: ${scores.role_load_score}/100
+    - Course Environment Score: ${scores.course_environment_score}/100
 
-  if (containsCrisis) {
-    riskCategory = "high";
-    severityLevel = "critical";
-    primaryContext = "mixed";
-    recommendations = [
-      "Please connect immediately with DLSU CPS. You can join the Virtual Zoom Office (Meeting ID: 939 8080 8838) to speak privately with an Intake Counselor, visit Room 203 Br. Connon Hall, or email cps@dlsu.edu.ph for urgent support.",
-      ...recommendations
-    ];
-  }
+    STUDENT WRITTEN REFLECTION (READ ENTIRE STRING FOR CONTEXT):
+    "${checkIn.reflection || 'No qualitative text reflection submitted this week.'}"
 
-  // Programmatic generation of the dynamic text summary
-  const weeklySummary = containsCrisis
-    ? "Critical alert triggered via qualitative analysis. Immediate direct support communication pathways active."
-    : `Analysis reveals a ${severityLevel} stress configuration primarily driven by ${primaryContext.replace('_', ' ')} dynamics. ${supportText}`;
+    MATCHED CAMPUS SUPPORT KNOWLEDGE (RAG CONTEXT):
+    ${supportText}
 
-  // Calculated compound Student Wellness Index (SWI) score out of 100
-  const calculatedSwi = Math.round(dimensions.reduce((sum, d) => sum + d.score, 0) / dimensions.length);
+    CRITICAL SAFETY & ESCALATION RULE:
+    If the student's written reflection text expresses severe symptoms of crisis, hopelessness, deep panic, isolation, or clear intent of self-harm, you must immediately override normal analytical processing and enforce these exact values:
+    1. Set "stress_severity_level" strictly to "critical".
+    2. Set "risk_category" strictly to "high".
+    3. Set "primary_stress_context" strictly to "mixed".
+    4. You MUST make the absolute first item in the "recommendations" array this exact message: "Please connect immediately with DLSU CPS. You can join the Virtual Zoom Office (Meeting ID: 939 8080 8838) to speak privately with an Intake Counselor, visit Room 203 Br. Connon Hall, or email cps@dlsu.edu.ph for urgent support."
 
-  // SAVE FINAL DATA OBJECT TO DB
-  const { data: insertedResult, error: dbError } = await supabase
-    .from('ai_results')
-    .insert([{
-      student_id,
-      check_in_id,
-      dimension_scores_id,
-      swi_score: calculatedSwi,
-      risk_category: riskCategory,
-      stress_severity_level: severityLevel,
-      primary_stress_context: primaryContext,
-      weekly_summary: weeklySummary.substring(0, 4000),
-      reflection_keywords: reflectionKeywords,
-      recommendations: recommendations,
-      analysis_method: 'llm_assisted', // Identifies this record as a rule/mock generated pass
-      analysis_version: '1.0-mock'
-    }])
-    .select()
-    .single();
+    STRICT OUTPUT FORMAT RULES:
+    You must respond with a raw JSON object matching these database constraints. Do not wrap your response in markdown formatting backticks (\`\`\`json). Provide only the clean stringified JSON object:
+    {
+      "risk_category": "low" | "moderate" | "high",
+      "stress_severity_level": "low_normal" | "moderate" | "severe" | "critical",
+      "primary_stress_context": "academic_engagement" | "personal_wellbeing" | "logistical_load" | "role_load" | "course_environment" | "mixed",
+      "weekly_summary": "A concise text summary (max 4000 characters) explaining the data trends and matching reflection contexts.",
+      "reflection_keywords": ["3-5 lowercase alphanumeric keywords extracted directly from the text reflection"],
+      "recommendations": ["Array of short, actionable time-management, behavioral, or campus support text strings"]
+    }`;
 
-  if (dbError) throw dbError;
+  // Execute high-speed inference on Groq using Llama-3.3-70b-versatile
+  const completion = await groqClient.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: `Process evaluation for check-in index reference ID: ${check_in_id}` }
+    ],
+    response_format: { type: "json_object" }
+  });
 
-  return insertedResult;
+  const aiPayload = JSON.parse(completion.choices[0].message.content);
+
+  // Calculate precise programmatic SWI score 
+  const totalScoreSum = 
+    Number(scores.academic_engagement_score) + 
+    Number(scores.personal_wellbeing_score) + 
+    Number(scores.logistical_load_score) + 
+    Number(scores.role_load_score) + 
+    Number(scores.course_environment_score);
+  const calculatedSwi = Number((totalScoreSum / 5).toFixed(2));
+  const calculatedRiskCategory = getRiskCategoryFromSwi(calculatedSwi);
+
+  // Ensure summary string is cleanly trimmed
+  const cleanSummary = (aiPayload.weekly_summary || "").trim().substring(0, 4000);
+
+  const storedResult = await storeAiResult(supabase, {
+    student_id,
+    check_in_id,
+    dimension_scores_id,
+    swi_score: calculatedSwi,
+    risk_category: calculatedRiskCategory,
+    stress_severity_level: aiPayload.stress_severity_level,
+    primary_stress_context: aiPayload.primary_stress_context,
+    reflection_keywords: aiPayload.reflection_keywords || [],
+    weekly_summary: cleanSummary,
+    recommendations: aiPayload.recommendations || [],
+    analysis_method: 'rag_assisted',
+    analysis_version: '1.0'
+  });
+
+  return storedResult;
 }
 
 module.exports = {
-  runMockWellnessPipeline
+  getAiResult,
+  getRiskCategoryFromSwi,
+  loadGroqClient,
+  runWellnessPipeline,
+  storeAiResult
 };

@@ -35,3 +35,20 @@ export async function calculateWellnessDimensions(authenticatedRequest, id) {
   );
   return response.wellnessDimensionScore;
 }
+
+export async function getWeeklyAnalysis(authenticatedRequest, id) {
+  const response = await authenticatedRequest(`/api/check-ins/${id}/analysis`);
+  return response.aiResult || null;
+}
+
+export async function analyzeWeeklyCheckIn(
+  authenticatedRequest,
+  id,
+  dimensionScoreId,
+) {
+  const response = await authenticatedRequest(`/api/check-ins/${id}/analyze`, {
+    method: "POST",
+    body: { dimension_scores_id: dimensionScoreId },
+  });
+  return response.data;
+}

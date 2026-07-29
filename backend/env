@@ -5,6 +5,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 SEED_USER_EMAIL=
 SEED_USER_PASSWORD=
 SEED_STUDENT_NUMBER=
+GROQ_API_KEY=
 
 
 // note you can put the anon key and service role key as the same 

@@ -373,7 +373,7 @@ function WeeklyCheckIn() {
                     <AppIcon name="sparkles" className="size-[18px]" />
                     View AI wellness plan
                   </Link>
-                  <p className="text-sm text-[#6f8178]">This demonstration plan uses mock AI results for now.</p>
+                  <p className="text-sm text-[#6f8178]">Uses your calculated dimensions and saved AI analysis.</p>
                 </div>
               </section>
 
