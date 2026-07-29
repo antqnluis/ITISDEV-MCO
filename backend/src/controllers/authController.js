@@ -58,6 +58,26 @@ async function me(req, res) {
     }
 }
 
+async function updateMe(req, res) {
+    try {
+        const student = await authService.updateCurrentStudent(
+            req.supabase,
+            req.user.id,
+            req.body
+        );
+
+        return res.status(200).json({
+            success: true,
+            student
+        });
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({
+            success: false,
+            message: error.statusCode ? error.message : "Server error"
+        });
+    }
+}
+
 async function logout(req, res) {
     try {
         await authService.logoutStudent(req.accessToken);
@@ -74,5 +94,6 @@ module.exports = {
     register,
     login,
     me,
+    updateMe,
     logout
 };

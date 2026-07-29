@@ -137,7 +137,13 @@ test("latest-week selection excludes older logs and preserves record order", () 
 });
 
 test("runSeededCourseEnvironment calculates the latest active-database week", async () => {
-    const scenario = buildDemoStudentScenario({ studentId, studentNumber, now: fixedNow });
+    const scenario = buildDemoStudentScenario({
+        studentId,
+        studentNumber,
+        firstName: "Andrea",
+        lastName: "Santos",
+        now: fixedNow
+    });
     const coursesById = new Map(scenario.tables.courses.map((course) => [course.id, course]));
     const { calls, supabase } = createSupabaseMock({
         courseLogs: scenario.tables.course_environment_logs.map((log) => ({
@@ -154,18 +160,18 @@ test("runSeededCourseEnvironment calculates the latest active-database week", as
         analysis.calculationInput.map((courseLog) => courseLog.courseCode),
         ["ITISDEV", "WEBAPDE"]
     );
-    assert.equal(analysis.result.score, 61.88);
+    assert.equal(analysis.result.score, 74.38);
     assert.deepEqual(analysis.result.courseScores.map(({ courseCode, score }) => ({
         courseCode,
         score
     })), [
-        { courseCode: "ITISDEV", score: 68.75 },
-        { courseCode: "WEBAPDE", score: 55 }
+        { courseCode: "ITISDEV", score: 81.25 },
+        { courseCode: "WEBAPDE", score: 67.5 }
     ]);
     assert.deepEqual(analysis.result.highestConcernCourse, {
         courseCode: "ITISDEV",
         courseName: "IT Systems Development",
-        score: 68.75
+        score: 81.25
     });
     assert.equal(analysis.result.hasSeriousPeerConcern, false);
     assert.deepEqual(

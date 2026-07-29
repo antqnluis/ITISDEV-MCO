@@ -253,6 +253,38 @@ test("deleteAcademicRecord scopes manual deletion and protects mock records", as
         ["student_id", studentId],
         ["source", "manual"]
     ]);
+
+    let linkedCalls = 0;
+    const linkedRecordSupabase = {
+        from() {
+            linkedCalls += 1;
+            if (linkedCalls === 1) return lookup(baseRecord);
+            return {
+                delete: () => ({
+                    eq() { return this; },
+                    select: () => ({
+                        maybeSingle: async () => ({
+                            data: null,
+                            error: { code: "23503" }
+                        })
+                    })
+                })
+            };
+        }
+    };
+    await assert.rejects(
+        deleteAcademicRecord(linkedRecordSupabase, studentId, recordId),
+        (error) => error.statusCode === 409
+            && error.message.includes("linked to a calendar event")
+    );
+
+    const mockSupabase = {
+        from: () => lookup({ ...baseRecord, source: "mock" })
+    };
+    await assert.rejects(
+        deleteAcademicRecord(mockSupabase, studentId, recordId),
+        (error) => error.statusCode === 403 && error.message.includes("Mock")
+    );
 });
 
 test("createMockAcademicRecord verifies course ownership before inserting", async () => {

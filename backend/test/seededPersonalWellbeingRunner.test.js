@@ -116,7 +116,13 @@ test("mapCheckInToPersonalWellbeingInput maps every database rating", () => {
 });
 
 test("runSeededPersonalWellbeing calculates the latest seeded check-in as 82.5", async () => {
-    const scenario = buildDemoStudentScenario({ studentId, studentNumber, now: fixedNow });
+    const scenario = buildDemoStudentScenario({
+        studentId,
+        studentNumber,
+        firstName: "Andrea",
+        lastName: "Santos",
+        now: fixedNow
+    });
     const latestCheckIn = scenario.tables.weekly_check_ins.at(-1);
     const { calls, supabase } = createSupabaseMock({ checkIns: [latestCheckIn] });
 

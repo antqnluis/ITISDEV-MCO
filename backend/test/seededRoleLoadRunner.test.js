@@ -95,32 +95,38 @@ test("profile role fields map to calculator input", () => {
 });
 
 test("runSeededRoleLoad calculates the seeded profile and queries only role data", async () => {
-    const scenario = buildDemoStudentScenario({ studentId, studentNumber, now: fixedNow });
+    const scenario = buildDemoStudentScenario({
+        studentId,
+        studentNumber,
+        firstName: "Andrea",
+        lastName: "Santos",
+        now: fixedNow
+    });
     const profile = scenario.tables.student_profiles[0];
     const { calls, supabase } = createSupabaseMock({ profile });
 
     const analysis = await runSeededRoleLoad({ supabase, studentNumber });
 
-    assert.equal(analysis.result.score, 100);
+    assert.equal(analysis.result.score, 76.36);
     assert.deepEqual(analysis.calculationInput, {
         hasCaregivingResponsibility: true,
-        caregivingHoursPerWeek: 5,
-        isAthlete: true,
-        athleteHoursPerWeek: 12,
+        caregivingHoursPerWeek: 10,
+        isAthlete: false,
+        athleteHoursPerWeek: 0,
         hasOrganizationResponsibility: true,
-        organizationHoursPerWeek: 8,
+        organizationHoursPerWeek: 10,
         roleWorkload: null,
         roleHoursCeiling: null
     });
     assert.deepEqual(analysis.result.components, {
-        roleHoursConcern: 100,
+        roleHoursConcern: 80,
         roleWorkloadConcern: null,
         ceilingExceedanceConcern: null,
-        activeRoleConcern: 100
+        activeRoleConcern: 66.66666666666666
     });
     assert.deepEqual(analysis.result.derivedValues, {
-        totalRoleHours: 25,
-        activeRoleCount: 3,
+        totalRoleHours: 20,
+        activeRoleCount: 2,
         excessHours: null,
         excessRatio: null
     });

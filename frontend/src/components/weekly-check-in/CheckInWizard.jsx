@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { usePrototypeData } from "../../context/usePrototypeData";
-import { getCurrentWeekStart } from "../../data/demoData";
 import ProgressIndicator from "../onboarding/ProgressIndicator";
 import Button from "../ui/Button";
 import MoodSelector from "./MoodSelector";
@@ -110,13 +108,21 @@ function CourseEnvironmentStep({ courseLogs, setCourseLogs }) {
     );
 }
 
-function CheckInWizard({ initialCheckIn, existingLogs = [], onSave, onCancel }) {
-    const { courses } = usePrototypeData();
+function CheckInWizard({
+    courses,
+    currentWeekStart,
+    initialCheckIn,
+    existingLogs = [],
+    isSubmitting = false,
+    onSave,
+    onCancel,
+    submissionError = "",
+}) {
     const [currentStep, setCurrentStep] = useState(1);
     const [checkIn, setCheckIn] = useState(() => ({
         ...initialCheckIn,
         id: initialCheckIn?.id || "",
-        week_start: initialCheckIn?.week_start || getCurrentWeekStart(),
+        week_start: initialCheckIn?.week_start || currentWeekStart,
         stress_level: initialCheckIn?.stress_level ?? null,
         mood_level: initialCheckIn?.mood_level ?? null,
         sleep_quality: initialCheckIn?.sleep_quality ?? null,
@@ -194,19 +200,26 @@ function CheckInWizard({ initialCheckIn, existingLogs = [], onSave, onCancel }) 
             return <WizardStep stepKey="motivation-and-burnout"><div className="space-y-10"><RatingQuestion id="motivation_level" question="How motivated have you felt toward your studies?" helper="Measures your willingness to engage with your studies this week." value={checkIn.motivation_level} onChange={(value) => updateCheckIn("motivation_level", value)} lowLabel="Very low" highLabel="Very high" error={errors.motivation_level} /><RatingQuestion id="burnout_level" question="How close to burnout are you feeling?" helper="Measures feelings of exhaustion or detachment—not academic performance." value={checkIn.burnout_level} onChange={(value) => updateCheckIn("burnout_level", value)} lowLabel="Not at all" highLabel="Exhausted" error={errors.burnout_level} /></div></WizardStep>;
         }
         if (currentStep === 4) {
-            return <WizardStep stepKey="reflection-and-summary"><div><label htmlFor="reflection" className="font-display text-2xl font-semibold tracking-[-0.025em] text-ink">Anything on your mind this week?</label><p className="mt-2 text-sm leading-6 text-copy sm:text-base">Tell us anything that affected your week—academics, responsibilities, relationships, or anything else.</p><textarea id="reflection" value={checkIn.reflection} onChange={(event) => updateCheckIn("reflection", event.target.value)} placeholder="This week I noticed..." className="form-control mt-5 min-h-36 resize-y p-4 leading-6" /><p className="mt-3 text-sm text-soft">Reflection is optional.</p><div className="mt-7"><WeeklySummaryCard checkIn={checkIn} moodLabel={moodLabel} studyHoursLabel={studyHoursLabel} /></div></div></WizardStep>;
+            return <WizardStep stepKey="reflection-and-summary"><div><label htmlFor="reflection" className="font-display text-2xl font-semibold tracking-[-0.025em] text-ink">Anything on your mind this week?</label><p className="mt-2 text-sm leading-6 text-copy sm:text-base">Tell us anything that affected your week—academics, responsibilities, relationships, or anything else.</p><textarea id="reflection" value={checkIn.reflection} onChange={(event) => updateCheckIn("reflection", event.target.value)} maxLength={4000} placeholder="This week I noticed..." className="form-control mt-5 min-h-36 resize-y p-4 leading-6" /><p className="mt-3 text-sm text-soft">Reflection is optional.</p><div className="mt-7"><WeeklySummaryCard checkIn={checkIn} moodLabel={moodLabel} studyHoursLabel={studyHoursLabel} /></div></div></WizardStep>;
         }
         return <CourseEnvironmentStep courseLogs={courseLogs} setCourseLogs={setCourseLogs} />;
     }
 
     return (
         <form onSubmit={handleSubmit}>
-            <ProgressIndicator currentStep={currentStep} totalSteps={totalSteps} />
-            <section className="surface-panel p-5 shadow-none sm:p-7">{renderStep()}</section>
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
-                {currentStep > 1 ? <Button type="button" variant="secondary" onClick={() => setCurrentStep((step) => step - 1)} className="sm:flex-1">Back</Button> : <Button type="button" variant="secondary" onClick={onCancel} className="sm:flex-1">Cancel</Button>}
-                {currentStep < totalSteps ? <Button key="continue" type="button" onClick={handleNext} className="sm:flex-1">Continue</Button> : <Button key="submit" type="submit" className="sm:flex-1">{initialCheckIn ? "Save Check-in" : "Submit Check-in"}</Button>}
-            </div>
+            {submissionError && (
+                <div role="alert" className="mb-5 rounded-xl border border-danger/25 bg-[#fff3f1] px-4 py-3 text-sm font-medium text-danger">
+                    {submissionError}
+                </div>
+            )}
+            <fieldset disabled={isSubmitting} className="min-w-0">
+                <ProgressIndicator currentStep={currentStep} totalSteps={totalSteps} />
+                <section className="surface-panel p-5 shadow-none sm:p-7">{renderStep()}</section>
+                <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
+                    {currentStep > 1 ? <Button type="button" variant="secondary" onClick={() => setCurrentStep((step) => step - 1)} disabled={isSubmitting} className="sm:flex-1">Back</Button> : <Button type="button" variant="secondary" onClick={onCancel} disabled={isSubmitting} className="sm:flex-1">Cancel</Button>}
+                    {currentStep < totalSteps ? <Button key="continue" type="button" onClick={handleNext} disabled={isSubmitting} className="sm:flex-1">Continue</Button> : <Button key="submit" type="submit" disabled={isSubmitting} className="sm:flex-1">{isSubmitting ? "Saving…" : initialCheckIn ? "Save Check-in" : "Submit Check-in"}</Button>}
+                </div>
+            </fieldset>
         </form>
     );
 }

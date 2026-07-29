@@ -1,11 +1,11 @@
 import AppRouter from "./router/AppRouter";
-import { PrototypeDataProvider } from "./context/PrototypeDataContext";
+import { AuthProvider } from "./context/AuthProvider";
 
 function App() {
   return (
-    <PrototypeDataProvider>
+    <AuthProvider>
       <AppRouter />
-    </PrototypeDataProvider>
+    </AuthProvider>
   );
 }
 

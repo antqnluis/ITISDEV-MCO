@@ -4,6 +4,7 @@ import CenteredAuthLayout from "../components/layout/CenteredAuthLayout";
 import Button from "../components/ui/Button";
 import InformationCard from "../components/ui/InformationCard";
 import PageHeader from "../components/ui/PageHeader";
+import { useAuth } from "../context/useAuth";
 
 const informationCards = [
   {
@@ -38,12 +39,31 @@ const informationCards = [
 function Consent() {
   const [hasReadConsent, setHasReadConsent] = useState(false);
   const [hasGivenConsent, setHasGivenConsent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
   const navigate = useNavigate();
-  const canContinue = hasReadConsent && hasGivenConsent;
+  const { acceptConsent, logout } = useAuth();
+  const canContinue = hasReadConsent && hasGivenConsent && !isSubmitting;
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    navigate("/onboarding");
+    if (!canContinue) return;
+
+    setIsSubmitting(true);
+    setFormError("");
+    try {
+      const destination = await acceptConsent();
+      navigate(destination, { replace: true });
+    } catch (error) {
+      setFormError(error.message || "Unable to record your consent. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleBack() {
+    await logout();
+    navigate("/register", { replace: true });
   }
 
   return (
@@ -77,6 +97,11 @@ function Consent() {
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 border-t border-line pt-7" noValidate>
+          {formError && (
+            <div role="alert" aria-live="polite" className="mb-5 rounded-xl border border-danger/25 bg-[#fff3f1] px-4 py-3 text-sm font-medium text-danger">
+              {formError}
+            </div>
+          )}
           <fieldset className="space-y-5">
             <legend className="sr-only">Privacy consent</legend>
 
@@ -84,7 +109,11 @@ function Consent() {
               <input
                 type="checkbox"
                 checked={hasReadConsent}
-                onChange={(event) => setHasReadConsent(event.target.checked)}
+                onChange={(event) => {
+                  setHasReadConsent(event.target.checked);
+                  setFormError("");
+                }}
+                disabled={isSubmitting}
                 className="mt-1 size-5 shrink-0 accent-brand"
               />
               <span>I have read and understood how AnimoLog collects and uses my information.</span>
@@ -94,7 +123,11 @@ function Consent() {
               <input
                 type="checkbox"
                 checked={hasGivenConsent}
-                onChange={(event) => setHasGivenConsent(event.target.checked)}
+                onChange={(event) => {
+                  setHasGivenConsent(event.target.checked);
+                  setFormError("");
+                }}
+                disabled={isSubmitting}
                 className="mt-1 size-5 shrink-0 accent-brand"
               />
               <span>I voluntarily consent to the collection and processing of my information to provide personalized wellness insights and recommendations.</span>
@@ -102,11 +135,11 @@ function Consent() {
           </fieldset>
 
           <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => navigate("/register")} className="sm:flex-1">
+            <Button type="button" variant="secondary" onClick={handleBack} disabled={isSubmitting} className="sm:flex-1">
               Back
             </Button>
             <Button type="submit" disabled={!canContinue} className="sm:flex-1">
-              Continue
+              {isSubmitting ? "Saving consent…" : "Continue"}
             </Button>
           </div>
         </form>
