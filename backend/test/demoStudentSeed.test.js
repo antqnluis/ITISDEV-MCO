@@ -14,7 +14,9 @@ const fixedNow = new Date("2026-07-14T08:00:00.000Z");
 const config = {
     email: "demo.student@example.com",
     password: "demo-password",
-    studentNumber: "20260001"
+    studentNumber: "20260001",
+    firstName: "Andrea",
+    lastName: "Santos"
 };
 
 test("validateSeedEnvironment requires safe seed credentials and normalizes identifiers", () => {
@@ -23,7 +25,9 @@ test("validateSeedEnvironment requires safe seed credentials and normalizes iden
         SUPABASE_SERVICE_ROLE_KEY: " service-key ",
         SEED_USER_EMAIL: " Demo.Student@Example.com ",
         SEED_USER_PASSWORD: "demo-password",
-        SEED_STUDENT_NUMBER: " 20260001 "
+        SEED_STUDENT_NUMBER: " 20260001 ",
+        SEED_FIRST_NAME: " Andrea ",
+        SEED_LAST_NAME: " Santos "
     });
 
     assert.deepEqual(validated, {
@@ -31,7 +35,9 @@ test("validateSeedEnvironment requires safe seed credentials and normalizes iden
         serviceRoleKey: "service-key",
         email: "demo.student@example.com",
         password: "demo-password",
-        studentNumber: "20260001"
+        studentNumber: "20260001",
+        firstName: "Andrea",
+        lastName: "Santos"
     });
 
     assert.throws(
@@ -44,9 +50,23 @@ test("validateSeedEnvironment requires safe seed credentials and normalizes iden
             SUPABASE_SERVICE_ROLE_KEY: "service-key",
             SEED_USER_EMAIL: "not-an-email",
             SEED_USER_PASSWORD: "demo-password",
-            SEED_STUDENT_NUMBER: "20260001"
+            SEED_STUDENT_NUMBER: "20260001",
+            SEED_FIRST_NAME: "Andrea",
+            SEED_LAST_NAME: "Santos"
         }),
         /valid email/
+    );
+    assert.throws(
+        () => validateSeedEnvironment({
+            SUPABASE_URL: "https://example.supabase.co",
+            SUPABASE_SERVICE_ROLE_KEY: "service-key",
+            SEED_USER_EMAIL: "demo.student@example.com",
+            SEED_USER_PASSWORD: "demo-password",
+            SEED_STUDENT_NUMBER: "20260001",
+            SEED_FIRST_NAME: "A".repeat(101),
+            SEED_LAST_NAME: "Santos"
+        }),
+        /SEED_FIRST_NAME must contain between 1 and 100 characters/
     );
 });
 
@@ -62,6 +82,8 @@ test("buildDemoStudentScenario covers every table, data field, enum, and relatio
     const scenario = buildDemoStudentScenario({
         studentId,
         studentNumber: config.studentNumber,
+        firstName: config.firstName,
+        lastName: config.lastName,
         now: fixedNow
     });
 
@@ -83,22 +105,21 @@ test("buildDemoStudentScenario covers every table, data field, enum, and relatio
     );
 
     const student = scenario.tables.students[0];
-    assert.equal(student.first_name, "Demo");
-    assert.equal(student.last_name, "Student");
+    assert.equal(student.first_name, "Andrea");
+    assert.equal(student.last_name, "Santos");
 
     const profile = scenario.tables.student_profiles[0];
-    for (const flag of [
-        "has_caregiving_responsibility",
-        "is_employed",
-        "has_ojt",
-        "is_athlete",
-        "has_organization_responsibility"
-    ]) {
-        assert.equal(profile[flag], true);
-    }
-    assert.equal(profile.organization_role, "Vice President");
+    assert.equal(profile.has_caregiving_responsibility, true);
+    assert.equal(profile.is_employed, true);
+    assert.equal(profile.has_ojt, false);
+    assert.equal(profile.is_athlete, false);
+    assert.equal(profile.has_organization_responsibility, true);
+    assert.equal(profile.organization_role, "Communications Committee Head");
     assert.equal(profile.current_academic_term, 1);
-    assert.deepEqual(profile.wellness_goals, ["Managing Stress", "Managing Workload", "Better Sleep"]);
+    assert.deepEqual(
+        profile.wellness_goals,
+        ["Managing Stress", "Managing Workload", "Time Management", "Better Sleep"]
+    );
     assert.match(profile.additional_context, /midterm/i);
 
     const recordTypes = new Set(scenario.tables.academic_records.map((record) => record.record_type));
@@ -127,9 +148,7 @@ test("buildDemoStudentScenario covers every table, data field, enum, and relatio
         "exam",
         "study_block",
         "rest_block",
-        "ojt",
         "organization",
-        "athletics",
         "caregiving",
         "work",
         "personal",
@@ -199,12 +218,62 @@ test("buildDemoStudentScenario covers every table, data field, enum, and relatio
             : result.swi_score < 70 ? "moderate" : "high";
         assert.equal(result.risk_category, expectedRisk);
     }
+
+    const latestScores = scenario.tables.wellness_dimension_scores.at(-1);
+    const latestResult = scenario.tables.ai_results.at(-1);
+    const latestScoreAverage = [
+        latestScores.academic_engagement_score,
+        latestScores.personal_wellbeing_score,
+        latestScores.logistical_load_score,
+        latestScores.role_load_score,
+        latestScores.course_environment_score
+    ].reduce((total, score) => total + score, 0) / 5;
+
+    assert.equal(Math.round(latestScoreAverage * 100) / 100, 70.19);
+    assert.equal(latestResult.swi_score, 70.19);
+    assert.equal(latestResult.risk_category, "high");
+    assert.equal(latestResult.stress_severity_level, "severe");
+    assert.equal(latestResult.primary_stress_context, "personal_wellbeing");
+    assert.ok(scenario.tables.ai_results.every(
+        (result) => result.stress_severity_level !== "critical"
+    ));
+    assert.doesNotMatch(
+        JSON.stringify({
+            checkIn: scenario.tables.weekly_check_ins.at(-1),
+            result: latestResult
+        }),
+        /\bcritical\b|immediate danger/i
+    );
 });
 
-function createSuccessfulSupabaseMock(existingUser = { id: studentId, email: config.email }) {
+test("scenario IDs are stable per student and disjoint between students", () => {
+    const build = (id) => buildDemoStudentScenario({
+        studentId: id,
+        studentNumber: config.studentNumber,
+        firstName: config.firstName,
+        lastName: config.lastName,
+        now: fixedNow
+    });
+    const first = build(studentId);
+    const repeated = build(studentId);
+    const second = build("22222222-2222-4222-8222-222222222222");
+    const collectIds = (scenario) => Object.values(scenario.tables)
+        .flatMap((rows) => rows.map((row) => row.id));
+
+    assert.deepEqual(collectIds(first), collectIds(repeated));
+    const firstIds = new Set(collectIds(first));
+    assert.ok(collectIds(second).every((id) => !firstIds.has(id)));
+});
+
+function createSuccessfulSupabaseMock(existingUser = {
+    id: studentId,
+    email: config.email,
+    user_metadata: { demo_seed: true }
+}) {
     const calls = {
         createUser: [],
         updateUser: [],
+        deleteUser: [],
         deletes: [],
         inserts: [],
         verifies: []
@@ -225,6 +294,10 @@ function createSuccessfulSupabaseMock(existingUser = { id: studentId, email: con
                 async createUser(attributes) {
                     calls.createUser.push(attributes);
                     return { data: { user: { ...authUser, email: attributes.email } }, error: null };
+                },
+                async deleteUser(id) {
+                    calls.deleteUser.push(id);
+                    return { data: {}, error: null };
                 }
             }
         },
@@ -267,6 +340,8 @@ test("runDemoStudentSeed updates an existing Auth user and replaces all public r
 
     assert.equal(result.authUserCreated, false);
     assert.equal(result.studentId, studentId);
+    assert.equal(result.firstName, config.firstName);
+    assert.equal(result.lastName, config.lastName);
     assert.deepEqual(Object.keys(result.counts), APPLICATION_TABLES);
     assert.equal(calls.createUser.length, 0);
     assert.equal(calls.updateUser.length, 1);
@@ -284,6 +359,26 @@ test("runDemoStudentSeed creates a missing Auth user", async () => {
     assert.equal(result.authUserCreated, true);
     assert.equal(calls.createUser.length, 1);
     assert.equal(calls.updateUser.length, 0);
+    assert.equal(calls.deleteUser.length, 0);
+    assert.deepEqual(calls.createUser[0].user_metadata, {
+        demo_seed: true,
+        persona: "severe_working_student_commuter_org_caregiver"
+    });
+});
+
+test("runDemoStudentSeed refuses to overwrite a non-demo Auth user", async () => {
+    const { calls, supabase } = createSuccessfulSupabaseMock({
+        id: studentId,
+        email: config.email,
+        user_metadata: { account_type: "student" }
+    });
+
+    await assert.rejects(
+        runDemoStudentSeed({ supabase, config, now: fixedNow }),
+        /Refusing to overwrite the non-demo Auth user/
+    );
+    assert.equal(calls.updateUser.length, 0);
+    assert.equal(calls.deletes.length, 0);
 });
 
 test("runDemoStudentSeed removes a partial public dataset after an insert failure", async () => {
@@ -308,4 +403,23 @@ test("runDemoStudentSeed removes a partial public dataset after an insert failur
         "weekly_check_ins",
         "courses"
     ]);
+    assert.equal(calls.deleteUser.length, 0);
+});
+
+test("runDemoStudentSeed removes a newly created Auth user after an insert failure", async () => {
+    const { calls, supabase } = createSuccessfulSupabaseMock(null);
+    const originalFrom = supabase.from.bind(supabase);
+    supabase.from = (table) => {
+        const query = originalFrom(table);
+        if (table === "academic_records") {
+            query.insert = async () => ({ error: { message: "simulated failure" } });
+        }
+        return query;
+    };
+
+    await assert.rejects(
+        runDemoStudentSeed({ supabase, config, now: fixedNow }),
+        /Unable to seed academic_records: simulated failure/
+    );
+    assert.deepEqual(calls.deleteUser, [studentId]);
 });

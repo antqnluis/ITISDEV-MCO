@@ -1,11 +1,14 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AppShell from "../components/layout/AppShell";
 import PageHeader from "../components/ui/PageHeader";
 import WellnessCard from "../components/ui/WellnessCard";
 import MetricCard from "../components/ui/MetricCard";
-import { usePrototypeData } from "../context/usePrototypeData";
-import { getCurrentWeekStart } from "../data/demoData";
+import { useAuth } from "../context/useAuth";
+import { listAllAcademicRecords } from "../services/academicRecordApi";
+import { listAllCalendarEvents } from "../services/calendarEventApi";
+import { listWeeklyCheckIns } from "../services/weeklyCheckInApi";
+import { listAllWellnessDimensionScores } from "../services/wellnessDimensionScoreApi";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -30,7 +33,27 @@ function formatDateTime(value) {
   });
 }
 
+function getCurrentWeekStart() {
+  const value = new Date();
+  value.setHours(0, 0, 0, 0);
+  const day = value.getDay() || 7;
+  value.setDate(value.getDate() - day + 1);
+
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const date = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${date}`;
+}
+
+function getDashboardEventRange() {
+  const from = new Date();
+  const to = new Date(from);
+  to.setFullYear(to.getFullYear() + 1);
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
 function getWellnessStatus(score) {
+  if (!Number.isFinite(score)) return { label: "Pending", tone: "" };
   if (score >= 80) return { label: "Thriving", tone: "Excellent" };
   if (score >= 65) return { label: "Steady", tone: "Stable" };
   if (score >= 45) return { label: "Needs support", tone: "Watch" };
@@ -38,7 +61,7 @@ function getWellnessStatus(score) {
 }
 
 function getWellnessIndex(checkIn) {
-  if (!checkIn) return 74;
+  if (!checkIn) return null;
 
   const ratings = [
     6 - checkIn.stress_level,
@@ -51,7 +74,7 @@ function getWellnessIndex(checkIn) {
 
   return ratings.length
     ? Math.round((ratings.reduce((total, value) => total + value, 0) / (ratings.length * 5)) * 100)
-    : 74;
+    : null;
 }
 
 function getMetricBadge(value) {
@@ -70,9 +93,52 @@ function getRiskBadge(value) {
 }
 
 function Dashboard() {
-  const { student, checkIns, dimensionScores, calendarEvents, academicRecords } = usePrototypeData();
+  const { authenticatedRequest, student } = useAuth();
+  const [checkIns, setCheckIns] = useState([]);
+  const [dimensionScores, setDimensionScores] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [academicRecords, setAcademicRecords] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   const currentWeekStart = useMemo(() => getCurrentWeekStart(), []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboardData() {
+      setIsLoading(true);
+      setLoadError("");
+
+      try {
+        const [loadedCheckIns, loadedScores, loadedEvents, loadedRecords] = await Promise.all([
+          listWeeklyCheckIns(authenticatedRequest),
+          listAllWellnessDimensionScores(authenticatedRequest),
+          listAllCalendarEvents(authenticatedRequest, getDashboardEventRange()),
+          listAllAcademicRecords(authenticatedRequest),
+        ]);
+
+        if (!cancelled) {
+          setCheckIns(loadedCheckIns);
+          setDimensionScores(loadedScores);
+          setCalendarEvents(loadedEvents);
+          setAcademicRecords(loadedRecords);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(error.message || "Unable to load your dashboard.");
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    loadDashboardData();
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticatedRequest, loadAttempt]);
 
   const latestCheckIn = useMemo(() => {
     if (!checkIns.length) return null;
@@ -258,16 +324,27 @@ function Dashboard() {
       <div className="mx-auto w-full max-w-[1200px] space-y-7">
         <div className="text-center">
           <PageHeader
-            title={`${getGreeting()}, ${student.first_name}.`}
-            subtitle={`Current week • ${formatWeekLabel(currentWeekStart)} • ${latestCheckIn ? "Latest weekly check-in available" : "No weekly check-in recorded yet"}`}
+            title={`${getGreeting()}, ${student?.first_name || "Student"}.`}
+            subtitle={`Current week • ${formatWeekLabel(currentWeekStart)} • ${isLoading ? "Loading dashboard data" : latestCheckIn ? "Latest weekly check-in available" : "No weekly check-in recorded yet"}`}
             className="text-center"
           />
         </div>
 
+        {loadError && (
+          <div role="alert" className="flex flex-col gap-3 rounded-xl border border-[#f2d9d6] bg-[#fff8f7] px-4 py-3 text-sm text-[#8a403b] sm:flex-row sm:items-center sm:justify-between">
+            <span>{loadError}</span>
+            <button type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)} className="font-semibold text-[#8a403b] underline underline-offset-2">
+              Try again
+            </button>
+          </div>
+        )}
+
         <WellnessCard
-          score={wellnessScore}
+          score={wellnessScore ?? "—"}
           status={wellnessStatus.label}
-          title={`Your student wellness index is ${wellnessScore}/100.`}
+          title={wellnessScore === null
+            ? "Complete a weekly check-in to calculate your wellness index."
+            : `Your student wellness index is ${wellnessScore}/100.`}
           description={
             latestCheckIn?.reflection
               ? `${latestCheckIn.reflection} ${wellnessStatus.tone} overall.`

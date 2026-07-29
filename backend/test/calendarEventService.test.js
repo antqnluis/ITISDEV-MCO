@@ -127,7 +127,7 @@ test("createCalendarEvent verifies an attached academic record belongs to the st
     );
 });
 
-test("listCalendarEvents scopes manual events and queries the selected overlap range", async () => {
+test("listCalendarEvents includes manual and mock events in the selected overlap range", async () => {
     const calls = { eq: [], lte: [], or: [], order: [], range: null };
     const request = {
         eq(field, value) {
@@ -175,7 +175,6 @@ test("listCalendarEvents scopes manual events and queries the selected overlap r
 
     assert.deepEqual(calls.eq, [
         ["student_id", studentId],
-        ["source", "manual"],
         ["event_type", "study_block"],
         ["status", "scheduled"]
     ]);

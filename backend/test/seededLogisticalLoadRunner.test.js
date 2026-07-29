@@ -115,8 +115,14 @@ test("database rows map to calculator input with weekly study-hour priority", ()
     assert.throws(() => mapDatabaseRowsToLogisticalInput(null), TypeError);
 });
 
-test("runSeededLogisticalLoad calculates the seeded database scenario as 60.74", async () => {
-    const scenario = buildDemoStudentScenario({ studentId, studentNumber, now: fixedNow });
+test("runSeededLogisticalLoad calculates the seeded database scenario as 63.7", async () => {
+    const scenario = buildDemoStudentScenario({
+        studentId,
+        studentNumber,
+        firstName: "Andrea",
+        lastName: "Santos",
+        now: fixedNow
+    });
     const profile = scenario.tables.student_profiles[0];
     const latestCheckIn = scenario.tables.weekly_check_ins.at(-1);
     const { calls, supabase } = createSupabaseMock({
@@ -126,21 +132,21 @@ test("runSeededLogisticalLoad calculates the seeded database scenario as 60.74",
 
     const analysis = await runSeededLogisticalLoad({ supabase, studentNumber });
 
-    assert.equal(analysis.result.score, 60.74);
+    assert.equal(analysis.result.score, 63.7);
     assert.equal(analysis.checkIn.week_start, "2026-07-13");
     assert.deepEqual(analysis.calculationInput, {
         weeklyAvailableStudyHours: 6,
-        profileAvailableStudyHours: 8,
+        profileAvailableStudyHours: 10,
         commuteMinutesPerDay: 90,
-        workHoursPerWeek: 20,
-        caregivingHoursPerWeek: 5,
+        workHoursPerWeek: 16,
+        caregivingHoursPerWeek: 10,
         internetProblems: null
     });
     assert.deepEqual(analysis.result.components, {
         studyTimeConcern: 60,
         commuteConcern: 50,
-        employmentConcern: 100,
-        caregivingConcern: 33.33333333333333,
+        employmentConcern: 80,
+        caregivingConcern: 66.66666666666666,
         internetConcern: null
     });
     assert.deepEqual(analysis.result.derivedValues, {
@@ -157,7 +163,13 @@ test("runSeededLogisticalLoad calculates the seeded database scenario as 60.74",
 });
 
 test("missing weekly check-ins allow the calculator to fall back to profile study hours", async () => {
-    const scenario = buildDemoStudentScenario({ studentId, studentNumber, now: fixedNow });
+    const scenario = buildDemoStudentScenario({
+        studentId,
+        studentNumber,
+        firstName: "Andrea",
+        lastName: "Santos",
+        now: fixedNow
+    });
     const { supabase } = createSupabaseMock({
         profile: scenario.tables.student_profiles[0],
         checkIns: []
@@ -167,7 +179,7 @@ test("missing weekly check-ins allow the calculator to fall back to profile stud
 
     assert.equal(analysis.checkIn, null);
     assert.equal(analysis.calculationInput.weeklyAvailableStudyHours, null);
-    assert.equal(analysis.result.derivedValues.availableStudyHoursUsed, 8);
+    assert.equal(analysis.result.derivedValues.availableStudyHoursUsed, 10);
 });
 
 test("printLogisticalLoadResult prints the final value before its breakdown", () => {

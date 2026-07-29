@@ -1,48 +1,7 @@
+const { createHash } = require("node:crypto");
+
 const MANILA_TIME_ZONE = "Asia/Manila";
 const MANILA_OFFSET = "+08:00";
-
-const IDS = Object.freeze({
-    profile: "10000000-0000-4000-8000-000000000001",
-    checkIns: Object.freeze([
-        "20000000-0000-4000-8000-000000000001",
-        "20000000-0000-4000-8000-000000000002",
-        "20000000-0000-4000-8000-000000000003"
-    ]),
-    courses: Object.freeze({
-        ITISDEV: "25000000-0000-4000-8000-000000000001",
-        DBADMN: "25000000-0000-4000-8000-000000000002",
-        WEBAPDE: "25000000-0000-4000-8000-000000000003",
-        PROFSWD: "25000000-0000-4000-8000-000000000004"
-    }),
-    academicRecords: Object.freeze([
-        "30000000-0000-4000-8000-000000000001",
-        "30000000-0000-4000-8000-000000000002",
-        "30000000-0000-4000-8000-000000000003",
-        "30000000-0000-4000-8000-000000000004",
-        "30000000-0000-4000-8000-000000000005",
-        "30000000-0000-4000-8000-000000000006",
-        "30000000-0000-4000-8000-000000000007",
-        "30000000-0000-4000-8000-000000000008"
-    ]),
-    calendarEvents: Object.freeze(Array.from({ length: 12 }, (_, index) => (
-        `40000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`
-    ))),
-    courseEnvironmentLogs: Object.freeze([
-        "50000000-0000-4000-8000-000000000001",
-        "50000000-0000-4000-8000-000000000002",
-        "50000000-0000-4000-8000-000000000003"
-    ]),
-    dimensionScores: Object.freeze([
-        "70000000-0000-4000-8000-000000000001",
-        "70000000-0000-4000-8000-000000000002",
-        "70000000-0000-4000-8000-000000000003"
-    ]),
-    aiResults: Object.freeze([
-        "60000000-0000-4000-8000-000000000001",
-        "60000000-0000-4000-8000-000000000002",
-        "60000000-0000-4000-8000-000000000003"
-    ])
-});
 
 const APPLICATION_TABLES = Object.freeze([
     "students",
@@ -65,13 +24,29 @@ function requireEnvironmentValue(environment, name) {
     return value.trim();
 }
 
+function validateStudentName(value, name) {
+    if (value.length > 100) {
+        throw new Error(`${name} must contain between 1 and 100 characters`);
+    }
+
+    return value;
+}
+
 function validateSeedEnvironment(environment = process.env) {
     const config = {
         supabaseUrl: requireEnvironmentValue(environment, "SUPABASE_URL"),
         serviceRoleKey: requireEnvironmentValue(environment, "SUPABASE_SERVICE_ROLE_KEY"),
         email: requireEnvironmentValue(environment, "SEED_USER_EMAIL").toLowerCase(),
         password: requireEnvironmentValue(environment, "SEED_USER_PASSWORD"),
-        studentNumber: requireEnvironmentValue(environment, "SEED_STUDENT_NUMBER")
+        studentNumber: requireEnvironmentValue(environment, "SEED_STUDENT_NUMBER"),
+        firstName: validateStudentName(
+            requireEnvironmentValue(environment, "SEED_FIRST_NAME"),
+            "SEED_FIRST_NAME"
+        ),
+        lastName: validateStudentName(
+            requireEnvironmentValue(environment, "SEED_LAST_NAME"),
+            "SEED_LAST_NAME"
+        )
     };
 
     if (!/^https?:\/\/[^\s]+$/i.test(config.supabaseUrl)) {
@@ -88,6 +63,49 @@ function validateSeedEnvironment(environment = process.env) {
     }
 
     return config;
+}
+
+function deterministicUuid(studentId, recordKey) {
+    const bytes = createHash("sha256")
+        .update(`${studentId}:${recordKey}`, "utf8")
+        .digest()
+        .subarray(0, 16);
+
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    const hex = bytes.toString("hex");
+    return [
+        hex.slice(0, 8),
+        hex.slice(8, 12),
+        hex.slice(12, 16),
+        hex.slice(16, 20),
+        hex.slice(20)
+    ].join("-");
+}
+
+function buildScenarioIds(studentId) {
+    const many = (prefix, count) => Object.freeze(
+        Array.from({ length: count }, (_, index) => (
+            deterministicUuid(studentId, `${prefix}:${index + 1}`)
+        ))
+    );
+
+    return Object.freeze({
+        profile: deterministicUuid(studentId, "profile"),
+        checkIns: many("check-in", 3),
+        courses: Object.freeze({
+            ITISDEV: deterministicUuid(studentId, "course:ITISDEV"),
+            DBADMN: deterministicUuid(studentId, "course:DBADMN"),
+            WEBAPDE: deterministicUuid(studentId, "course:WEBAPDE"),
+            PROFSWD: deterministicUuid(studentId, "course:PROFSWD")
+        }),
+        academicRecords: many("academic-record", 8),
+        calendarEvents: many("calendar-event", 12),
+        courseEnvironmentLogs: many("course-environment-log", 3),
+        dimensionScores: many("dimension-score", 3),
+        aiResults: many("ai-result", 3)
+    });
 }
 
 function toManilaCalendarDate(now) {
@@ -178,14 +196,27 @@ function scheduledEvent({
     };
 }
 
-function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }) {
+function buildDemoStudentScenario({
+    studentId,
+    studentNumber,
+    firstName,
+    lastName,
+    now = new Date()
+}) {
     if (typeof studentId !== "string" || studentId.trim().length === 0) {
         throw new Error("studentId is required");
     }
     if (typeof studentNumber !== "string" || studentNumber.trim().length === 0) {
         throw new Error("studentNumber is required");
     }
+    if (typeof firstName !== "string" || firstName.trim().length === 0) {
+        throw new Error("firstName is required");
+    }
+    if (typeof lastName !== "string" || lastName.trim().length === 0) {
+        throw new Error("lastName is required");
+    }
 
+    const ids = buildScenarioIds(studentId);
     const anchor = getManilaWeekAnchor(now);
     const weekStarts = [-14, -7, 0].map((offset) => toDateString(addDays(anchor, offset)));
     const seededAt = timestampAt(anchor, 0, "07:00:00");
@@ -193,41 +224,41 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
     const students = [{
         id: studentId,
         student_number: studentNumber,
-        first_name: "Demo",
-        last_name: "Student",
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         consent_given: true,
         consented_at: timestampAt(anchor, -20, "18:30:00"),
         privacy_notice_version: "v1.0"
     }];
 
     const studentProfiles = [{
-        id: IDS.profile,
+        id: ids.profile,
         student_id: studentId,
         college: "College of Computer Studies",
         program: "BS Information Technology",
         year_level: 3,
         current_academic_term: 1,
-        wellness_goals: ["Managing Stress", "Managing Workload", "Better Sleep"],
+        wellness_goals: ["Managing Stress", "Managing Workload", "Time Management", "Better Sleep"],
         commute_minutes_per_day: 90,
-        available_study_hours_per_week: 8,
+        available_study_hours_per_week: 10,
         has_caregiving_responsibility: true,
-        caregiving_hours_per_week: 5,
+        caregiving_hours_per_week: 10,
         is_employed: true,
-        work_hours_per_week: 20,
-        has_ojt: true,
-        ojt_hours_per_week: 8,
-        is_athlete: true,
-        athlete_hours_per_week: 12,
+        work_hours_per_week: 16,
+        has_ojt: false,
+        ojt_hours_per_week: 0,
+        is_athlete: false,
+        athlete_hours_per_week: 0,
         has_organization_responsibility: true,
-        organization_role: "Vice President",
-        organization_hours_per_week: 8,
-        additional_context: "Midterm season overlaps with varsity training, an organization event, part-time work, OJT deliverables, commuting, and caregiving. The student is prioritizing urgent requirements but has less time for sleep and focused study.",
+        organization_role: "Communications Committee Head",
+        organization_hours_per_week: 10,
+        additional_context: "Midterm requirements overlap with four part-time evening shifts, a student organization campaign, a long daily commute, and regular care for a younger sibling. The student is trying to protect study time but has recently been sleeping less and falling behind on selected requirements.",
         onboarding_completed_at: timestampAt(anchor, -20, "18:45:00")
     }];
 
     const weeklyCheckIns = [
         {
-            id: IDS.checkIns[0],
+            id: ids.checkIns[0],
             student_id: studentId,
             week_start: weekStarts[0],
             stress_level: 3,
@@ -236,26 +267,26 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             motivation_level: 4,
             burnout_level: 2,
             energy_level: 4,
-            available_study_hours: 14,
-            reflection: "Midterm requirements are starting to accumulate, but my study plan is still manageable alongside training, work, OJT, and organization preparation.",
+            available_study_hours: 13,
+            reflection: "Midterm requirements are beginning to accumulate, but my weekly plan is still manageable alongside work, commuting, family responsibilities, and organization preparation.",
             submitted_at: timestampAt(anchor, -14, "20:00:00")
         },
         {
-            id: IDS.checkIns[1],
+            id: ids.checkIns[1],
             student_id: studentId,
             week_start: weekStarts[1],
             stress_level: 4,
             mood_level: 3,
-            sleep_quality: 2,
+            sleep_quality: 3,
             motivation_level: 3,
-            burnout_level: 4,
+            burnout_level: 3,
             energy_level: 3,
-            available_study_hours: 10,
-            reflection: "I submitted one sprint late and missed a database exercise after work and varsity practice ran long. The organization midterm event also needs VP approval.",
+            available_study_hours: 9,
+            reflection: "I submitted one sprint late and missed a database exercise after two evening shifts. Preparing the organization campaign and helping my sibling with school also reduced my review time.",
             submitted_at: timestampAt(anchor, -7, "21:15:00")
         },
         {
-            id: IDS.checkIns[2],
+            id: ids.checkIns[2],
             student_id: studentId,
             week_start: weekStarts[2],
             stress_level: 5,
@@ -265,24 +296,24 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             burnout_level: 5,
             energy_level: 2,
             available_study_hours: 6,
-            reflection: "This is the heaviest midterm week. I have exams and project deadlines while working evening shifts, attending OJT, training for competition, caring for a family member, and leading the organization as vice president.",
+            reflection: "This is my heaviest midterm week. Two requirements slipped while I balanced evening shifts, the commute, family care, and our organization campaign. I am still attending classes, but I need help prioritizing deadlines and protecting sleep.",
             submitted_at: timestampAt(anchor, 0, "07:00:00")
         }
     ];
 
     const courses = [
-        { id: IDS.courses.ITISDEV, student_id: studentId, code: "ITISDEV", name: "IT Systems Development" },
-        { id: IDS.courses.DBADMN, student_id: studentId, code: "DBADMN", name: "Database Administration" },
-        { id: IDS.courses.WEBAPDE, student_id: studentId, code: "WEBAPDE", name: "Web Application Development" },
-        { id: IDS.courses.PROFSWD, student_id: studentId, code: "PROFSWD", name: "Professional Software Development" }
+        { id: ids.courses.ITISDEV, student_id: studentId, code: "ITISDEV", name: "IT Systems Development" },
+        { id: ids.courses.DBADMN, student_id: studentId, code: "DBADMN", name: "Database Administration" },
+        { id: ids.courses.WEBAPDE, student_id: studentId, code: "WEBAPDE", name: "Web Application Development" },
+        { id: ids.courses.PROFSWD, student_id: studentId, code: "PROFSWD", name: "Professional Software Development" }
     ];
 
     const academicRecords = [
         {
-            id: IDS.academicRecords[0],
+            id: ids.academicRecords[0],
             student_id: studentId,
             source: "mock",
-            course_id: IDS.courses.ITISDEV,
+            course_id: ids.courses.ITISDEV,
             record_type: "grade_snapshot",
             title: "Pre-midterm standing",
             due_at: null,
@@ -293,24 +324,24 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             recorded_at: timestampAt(anchor, -14, "09:00:00")
         },
         {
-            id: IDS.academicRecords[1],
+            id: ids.academicRecords[1],
             student_id: studentId,
             source: "mock",
-            course_id: IDS.courses.ITISDEV,
+            course_id: ids.courses.ITISDEV,
             record_type: "grade_snapshot",
             title: "Current midterm standing",
             due_at: null,
             submitted_at: null,
             submission_status: "not_applicable",
-            score: 74,
+            score: 62,
             max_score: 100,
             recorded_at: timestampAt(anchor, -1, "18:00:00")
         },
         {
-            id: IDS.academicRecords[2],
+            id: ids.academicRecords[2],
             student_id: studentId,
             source: "mock",
-            course_id: IDS.courses.ITISDEV,
+            course_id: ids.courses.ITISDEV,
             record_type: "assignment",
             title: "Sprint 2 implementation",
             due_at: timestampAt(anchor, -10, "23:59:00"),
@@ -321,24 +352,24 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             recorded_at: timestampAt(anchor, -8, "10:00:00")
         },
         {
-            id: IDS.academicRecords[3],
+            id: ids.academicRecords[3],
             student_id: studentId,
             source: "mock",
-            course_id: IDS.courses.DBADMN,
+            course_id: ids.courses.DBADMN,
             record_type: "assignment",
             title: "Index optimization exercise",
             due_at: timestampAt(anchor, -6, "23:59:00"),
             submitted_at: null,
             submission_status: "missed",
-            score: 0,
-            max_score: 20,
+            score: null,
+            max_score: null,
             recorded_at: timestampAt(anchor, -5, "08:00:00")
         },
         {
-            id: IDS.academicRecords[4],
+            id: ids.academicRecords[4],
             student_id: studentId,
             source: "mock",
-            course_id: IDS.courses.WEBAPDE,
+            course_id: ids.courses.WEBAPDE,
             record_type: "assessment",
             title: "Midterm practical examination",
             due_at: timestampAt(anchor, 2, "13:00:00"),
@@ -349,24 +380,24 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             recorded_at: seededAt
         },
         {
-            id: IDS.academicRecords[5],
+            id: ids.academicRecords[5],
             student_id: studentId,
             source: "mock",
-            course_id: IDS.courses.ITISDEV,
+            course_id: ids.courses.ITISDEV,
             record_type: "assignment",
-            title: "Midterm project demonstration",
-            due_at: timestampAt(anchor, 4, "17:00:00"),
+            title: "Midterm integration milestone",
+            due_at: timestampAt(anchor, -2, "17:00:00"),
             submitted_at: null,
-            submission_status: "upcoming",
+            submission_status: "missed",
             score: null,
             max_score: null,
-            recorded_at: seededAt
+            recorded_at: timestampAt(anchor, -1, "09:00:00")
         },
         {
-            id: IDS.academicRecords[6],
+            id: ids.academicRecords[6],
             student_id: studentId,
             source: "mock",
-            course_id: IDS.courses.PROFSWD,
+            course_id: ids.courses.PROFSWD,
             record_type: "assessment",
             title: "Architecture quiz",
             due_at: timestampAt(anchor, -12, "10:00:00"),
@@ -377,10 +408,10 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
             recorded_at: timestampAt(anchor, -11, "12:00:00")
         },
         {
-            id: IDS.academicRecords[7],
+            id: ids.academicRecords[7],
             student_id: studentId,
             source: "mock",
-            course_id: IDS.courses.DBADMN,
+            course_id: ids.courses.DBADMN,
             record_type: "engagement_snapshot",
             title: "Midterm attendance and participation",
             due_at: null,
@@ -394,63 +425,63 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
 
     const calendarEvents = [
         completedEvent({
-            id: IDS.calendarEvents[0], studentId, eventType: "class",
+            id: ids.calendarEvents[0], studentId, eventType: "class",
             title: "Database Administration lecture", description: "Midterm review on indexing and query plans.",
             location: "Gokongwei Hall 302", startsAt: timestampAt(anchor, -1, "09:15:00"), endsAt: timestampAt(anchor, -1, "10:45:00")
         }),
         scheduledEvent({
-            id: IDS.calendarEvents[1], studentId, academicRecordId: IDS.academicRecords[5], eventType: "assignment_deadline",
-            title: "ITISDEV midterm project due", description: "Final code, documentation, and project demonstration.",
+            id: ids.calendarEvents[1], studentId, eventType: "assignment_deadline",
+            title: "ITISDEV recovery submission deadline", description: "Submit the missed integration milestone after confirming the recovery arrangement with the instructor.",
             location: "Online submission portal", startsAt: timestampAt(anchor, 4, "17:00:00"), endsAt: timestampAt(anchor, 4, "17:30:00")
         }),
         scheduledEvent({
-            id: IDS.calendarEvents[2], studentId, academicRecordId: IDS.academicRecords[4], eventType: "exam",
+            id: ids.calendarEvents[2], studentId, academicRecordId: ids.academicRecords[4], eventType: "exam",
             title: "WEBAPDE practical midterm", description: "Timed individual practical examination.",
             location: "Computer Laboratory 4", startsAt: timestampAt(anchor, 2, "13:00:00"), endsAt: timestampAt(anchor, 2, "15:00:00")
         }),
         scheduledEvent({
-            id: IDS.calendarEvents[3], studentId, eventType: "study_block",
+            id: ids.calendarEvents[3], studentId, eventType: "study_block",
             title: "Focused midterm review", description: "Practice database queries and review web application exercises.",
             location: "Learning Commons", startsAt: timestampAt(anchor, 1, "19:00:00"), endsAt: timestampAt(anchor, 1, "21:00:00")
         }),
         scheduledEvent({
-            id: IDS.calendarEvents[4], studentId, eventType: "rest_block",
+            id: ids.calendarEvents[4], studentId, eventType: "rest_block",
             title: "Protected recovery time", description: "Dinner, screen break, and early sleep before the practical exam.",
             location: "Home", startsAt: timestampAt(anchor, 1, "21:00:00"), endsAt: timestampAt(anchor, 1, "22:30:00")
         }),
         scheduledEvent({
-            id: IDS.calendarEvents[5], studentId, eventType: "ojt",
-            title: "OJT sprint review", description: "Present completed tickets and receive mentor feedback.",
-            location: "Partner company office", startsAt: timestampAt(anchor, 3, "08:00:00"), endsAt: timestampAt(anchor, 3, "12:00:00")
+            id: ids.calendarEvents[5], studentId, eventType: "work",
+            title: "Part-time customer support shift", description: "Handle the morning support queue and document unresolved requests.",
+            location: "Remote", startsAt: timestampAt(anchor, 5, "08:00:00"), endsAt: timestampAt(anchor, 5, "12:00:00")
         }),
         scheduledEvent({
-            id: IDS.calendarEvents[6], studentId, eventType: "organization",
-            title: "Student organization midterm assembly", description: "Facilitate the program and coordinate officers as vice president.",
+            id: ids.calendarEvents[6], studentId, eventType: "organization",
+            title: "Student organization campaign launch", description: "Coordinate publication materials and brief the communications volunteers.",
             location: "Multipurpose Hall", startsAt: timestampAt(anchor, 3, "18:00:00"), endsAt: timestampAt(anchor, 3, "21:00:00")
         }),
         scheduledEvent({
-            id: IDS.calendarEvents[7], studentId, eventType: "athletics",
-            title: "Varsity team training", description: "Final conditioning session before the weekend competition.",
-            location: "University Sports Complex", startsAt: timestampAt(anchor, 1, "16:00:00"), endsAt: timestampAt(anchor, 1, "18:30:00")
+            id: ids.calendarEvents[7], studentId, eventType: "organization",
+            title: "Campaign publication work session", description: "Finalize captions, graphics, and the volunteer posting schedule.",
+            location: "Student Media Office", startsAt: timestampAt(anchor, 1, "16:00:00"), endsAt: timestampAt(anchor, 1, "18:30:00")
         }),
         scheduledEvent({
-            id: IDS.calendarEvents[8], studentId, eventType: "caregiving",
+            id: ids.calendarEvents[8], studentId, eventType: "caregiving",
             title: "Family medical appointment", description: "Accompany a family member and manage transportation.",
             location: "Community Health Center", startsAt: timestampAt(anchor, 4, "08:00:00"), endsAt: timestampAt(anchor, 4, "10:00:00")
         }),
         scheduledEvent({
-            id: IDS.calendarEvents[9], studentId, eventType: "work",
-            title: "Part-time evening shift", description: "Customer support shift after classes.",
+            id: ids.calendarEvents[9], studentId, eventType: "work",
+            title: "Part-time evening shift", description: "Customer support shift after classes and the commute home.",
             location: "Remote", startsAt: timestampAt(anchor, 0, "18:00:00"), endsAt: timestampAt(anchor, 0, "22:00:00")
         }),
         scheduledEvent({
-            id: IDS.calendarEvents[10], studentId, eventType: "personal",
+            id: ids.calendarEvents[10], studentId, eventType: "personal",
             title: "Family birthday", description: "Reserved family commitment during midterm weekend.",
             location: "Home", startsAt: timestampAt(anchor, 6, "00:00:00"), endsAt: timestampAt(anchor, 6, "23:59:00"), allDay: true
         }),
         {
             ...scheduledEvent({
-                id: IDS.calendarEvents[11], studentId, eventType: "other",
+                id: ids.calendarEvents[11], studentId, eventType: "other",
                 title: "Optional career webinar", description: "Webinar cancelled to protect midterm study time.",
                 location: "Online", startsAt: timestampAt(anchor, 2, "18:00:00"), endsAt: timestampAt(anchor, 2, "19:00:00")
             }),
@@ -460,22 +491,22 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
 
     const courseEnvironmentLogs = [
         {
-            id: IDS.courseEnvironmentLogs[0], student_id: studentId, check_in_id: IDS.checkIns[2],
-            course_id: IDS.courses.ITISDEV, week_start: weekStarts[2],
-            workload_difficulty: 5, unclear_instruction_level: 3, grading_concern_level: 4,
-            professor_approachability_concern: 2, groupmate_issue_level: 4,
-            concern_notes: "The midterm scope is large and two group members have limited availability, leaving more integration and documentation work for me."
+            id: ids.courseEnvironmentLogs[0], student_id: studentId, check_in_id: ids.checkIns[2],
+            course_id: ids.courses.ITISDEV, week_start: weekStarts[2],
+            workload_difficulty: 5, unclear_instruction_level: 4, grading_concern_level: 4,
+            professor_approachability_concern: 4, groupmate_issue_level: 4,
+            concern_notes: "The midterm scope is large and two group members have limited availability, leaving most integration and documentation work to be finished alongside the recovery submission."
         },
         {
-            id: IDS.courseEnvironmentLogs[1], student_id: studentId, check_in_id: IDS.checkIns[2],
-            course_id: IDS.courses.WEBAPDE, week_start: weekStarts[2],
+            id: ids.courseEnvironmentLogs[1], student_id: studentId, check_in_id: ids.checkIns[2],
+            course_id: ids.courses.WEBAPDE, week_start: weekStarts[2],
             workload_difficulty: 5, unclear_instruction_level: 4, grading_concern_level: 3,
-            professor_approachability_concern: 3, groupmate_issue_level: 1,
+            professor_approachability_concern: 3, groupmate_issue_level: 3,
             concern_notes: "The practical exam coverage is broad and some deployment instructions need clarification before exam day."
         },
         {
-            id: IDS.courseEnvironmentLogs[2], student_id: studentId, check_in_id: IDS.checkIns[1],
-            course_id: IDS.courses.DBADMN, week_start: weekStarts[1],
+            id: ids.courseEnvironmentLogs[2], student_id: studentId, check_in_id: ids.checkIns[1],
+            course_id: ids.courses.DBADMN, week_start: weekStarts[1],
             workload_difficulty: 4, unclear_instruction_level: 2, grading_concern_level: 5,
             professor_approachability_concern: 2, groupmate_issue_level: 1,
             concern_notes: "Missing the optimization exercise significantly affected the current grade, although the lesson materials are clear."
@@ -484,23 +515,23 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
 
     const wellnessDimensionScores = [
         {
-            id: IDS.dimensionScores[0], student_id: studentId, check_in_id: IDS.checkIns[0],
-            academic_engagement_score: 35, personal_wellbeing_score: 38,
-            logistical_load_score: 58, role_load_score: 66, course_environment_score: 30,
+            id: ids.dimensionScores[0], student_id: studentId, check_in_id: ids.checkIns[0],
+            academic_engagement_score: 35, personal_wellbeing_score: 36.25,
+            logistical_load_score: 50, role_load_score: 76.36, course_environment_score: 30,
             calculation_method: "rule_based", calculation_version: "1.0",
             calculated_at: timestampAt(anchor, -14, "20:00:00")
         },
         {
-            id: IDS.dimensionScores[1], student_id: studentId, check_in_id: IDS.checkIns[1],
-            academic_engagement_score: 82, personal_wellbeing_score: 70,
-            logistical_load_score: 68, role_load_score: 76, course_environment_score: 72,
+            id: ids.dimensionScores[1], student_id: studentId, check_in_id: ids.checkIns[1],
+            academic_engagement_score: 50, personal_wellbeing_score: 56.25,
+            logistical_load_score: 58, role_load_score: 76.36, course_environment_score: 55,
             calculation_method: "rule_based", calculation_version: "1.0",
             calculated_at: timestampAt(anchor, -7, "21:15:00")
         },
         {
-            id: IDS.dimensionScores[2], student_id: studentId, check_in_id: IDS.checkIns[2],
-            academic_engagement_score: 91, personal_wellbeing_score: 92,
-            logistical_load_score: 82, role_load_score: 94, course_environment_score: 81,
+            id: ids.dimensionScores[2], student_id: studentId, check_in_id: ids.checkIns[2],
+            academic_engagement_score: 54, personal_wellbeing_score: 82.5,
+            logistical_load_score: 63.7, role_load_score: 76.36, course_environment_score: 74.38,
             calculation_method: "rule_based", calculation_version: "1.0",
             calculated_at: timestampAt(anchor, 0, "07:00:00")
         }
@@ -508,42 +539,42 @@ function buildDemoStudentScenario({ studentId, studentNumber, now = new Date() }
 
     const aiResults = [
         {
-            id: IDS.aiResults[0], student_id: studentId, check_in_id: IDS.checkIns[0],
-            dimension_scores_id: IDS.dimensionScores[0],
-            swi_score: 48, risk_category: "moderate", stress_severity_level: "moderate",
+            id: ids.aiResults[0], student_id: studentId, check_in_id: ids.checkIns[0],
+            dimension_scores_id: ids.dimensionScores[0],
+            swi_score: 46, risk_category: "moderate", stress_severity_level: "moderate",
             primary_stress_context: "role_load",
-            reflection_keywords: ["requirements", "training", "work", "manageable"],
-            weekly_summary: "The student is managing early midterm pressure, but overlapping employment, athletics, OJT, organization, and caregiving roles are reducing schedule flexibility.",
+            reflection_keywords: ["requirements", "work", "commute", "manageable"],
+            weekly_summary: "The student is managing early midterm pressure, while employment, commuting, organization work, and family care are already reducing schedule flexibility.",
             recommendations: [
                 { "priority": "medium", "action": "Reserve two protected study blocks before requirements become urgent." },
-                { "priority": "medium", "action": "Delegate one organization preparation task to another officer." }
+                { "priority": "medium", "action": "Share one campaign-preparation task with another committee member." }
             ],
             analysis_method: "rag_assisted", analysis_version: "1.0", generated_at: timestampAt(anchor, -14, "20:05:00")
         },
         {
-            id: IDS.aiResults[1], student_id: studentId, check_in_id: IDS.checkIns[1],
-            dimension_scores_id: IDS.dimensionScores[1],
-            swi_score: 73, risk_category: "high", stress_severity_level: "severe",
-            primary_stress_context: "academic_engagement",
-            reflection_keywords: ["late", "missed", "practice", "approval"],
-            weekly_summary: "A late submission and a missed exercise indicate that the combined midterm and role load is beginning to affect academic engagement and recovery.",
+            id: ids.aiResults[1], student_id: studentId, check_in_id: ids.checkIns[1],
+            dimension_scores_id: ids.dimensionScores[1],
+            swi_score: 59, risk_category: "moderate", stress_severity_level: "moderate",
+            primary_stress_context: "role_load",
+            reflection_keywords: ["late", "missed", "work", "campaign", "family"],
+            weekly_summary: "A late submission and a missed exercise show that the combined academic and role load is beginning to affect study time and recovery.",
             recommendations: [
-                { "priority": "high", "action": "Contact the database instructor about recovery options for the missed exercise." },
-                { "priority": "high", "action": "Reduce or swap one work or training commitment this week." }
+                { "priority": "medium", "action": "Contact the database instructor about recovery options for the missed exercise." },
+                { "priority": "medium", "action": "Swap one evening work shift before the busiest midterm days." }
             ],
             analysis_method: "rag_assisted", analysis_version: "1.0", generated_at: timestampAt(anchor, -7, "21:20:00")
         },
         {
-            id: IDS.aiResults[2], student_id: studentId, check_in_id: IDS.checkIns[2],
-            dimension_scores_id: IDS.dimensionScores[2],
-            swi_score: 89, risk_category: "high", stress_severity_level: "critical",
-            primary_stress_context: "mixed",
-            reflection_keywords: ["heaviest", "exams", "deadlines", "working", "training", "caregiving", "vice president"],
-            weekly_summary: "Critical midterm stress is driven by urgent academic requirements, very limited study time, poor sleep, and simultaneous work, OJT, athletics, caregiving, and leadership commitments.",
+            id: ids.aiResults[2], student_id: studentId, check_in_id: ids.checkIns[2],
+            dimension_scores_id: ids.dimensionScores[2],
+            swi_score: 70.19, risk_category: "high", stress_severity_level: "severe",
+            primary_stress_context: "personal_wellbeing",
+            reflection_keywords: ["heaviest", "missed", "shifts", "commute", "family", "campaign", "sleep"],
+            weekly_summary: "Severe midterm stress is being driven by missed academic work, poor sleep, limited study time, employment, commuting, family care, and organization responsibilities.",
             recommendations: [
-                { "priority": "urgent", "action": "Use the protected study and recovery blocks and avoid adding optional commitments." },
-                { "priority": "urgent", "action": "Ask instructors and teammates for deadline or workload support before the upcoming exams." },
-                { "priority": "high", "action": "Delegate assembly logistics to organization officers and discuss a work-shift adjustment." }
+                { "priority": "high", "action": "Use the protected study and recovery blocks and decline optional commitments this week." },
+                { "priority": "high", "action": "Ask instructors about recovery options and realistic sequencing for the missed requirements." },
+                { "priority": "high", "action": "Delegate campaign publishing tasks and request one work-shift adjustment." }
             ],
             analysis_method: "rag_assisted", analysis_version: "1.0", generated_at: timestampAt(anchor, 0, "07:05:00")
         }
@@ -593,10 +624,19 @@ async function ensureAuthUser(supabase, config) {
         email: config.email,
         password: config.password,
         email_confirm: true,
-        user_metadata: { demo_seed: true, persona: "midterm_working_student_athlete_org_vp" }
+        user_metadata: {
+            demo_seed: true,
+            persona: "severe_working_student_commuter_org_caregiver"
+        }
     };
 
     if (existingUser) {
+        if (existingUser.user_metadata?.demo_seed !== true) {
+            throw new Error(
+                `Refusing to overwrite the non-demo Auth user registered as ${config.email}`
+            );
+        }
+
         const { data, error } = await supabase.auth.admin.updateUserById(existingUser.id, attributes);
         if (error) {
             throw new Error(`Unable to update the seed Auth user: ${error.message}`);
@@ -667,15 +707,16 @@ async function runDemoStudentSeed({ supabase, config, now = new Date() }) {
     }
 
     const studentId = authResult.user.id;
-    const scenario = buildDemoStudentScenario({
-        studentId,
-        studentNumber: config.studentNumber,
-        now
-    });
-
-    await deletePublicStudent(supabase, studentId);
-
     try {
+        const scenario = buildDemoStudentScenario({
+            studentId,
+            studentNumber: config.studentNumber,
+            firstName: config.firstName,
+            lastName: config.lastName,
+            now
+        });
+
+        await deletePublicStudent(supabase, studentId);
         await insertScenario(supabase, scenario);
         const counts = await verifyScenario(supabase, studentId, scenario);
         return {
@@ -683,14 +724,31 @@ async function runDemoStudentSeed({ supabase, config, now = new Date() }) {
             studentId,
             email: config.email,
             studentNumber: config.studentNumber,
+            firstName: config.firstName,
+            lastName: config.lastName,
             anchorDate: scenario.anchorDate,
             counts
         };
     } catch (error) {
+        const cleanupErrors = [];
+
         try {
             await deletePublicStudent(supabase, studentId);
         } catch (cleanupError) {
-            error.message += ` Cleanup also failed: ${cleanupError.message}`;
+            cleanupErrors.push(cleanupError.message);
+        }
+
+        if (authResult.created) {
+            const { error: authCleanupError } = await supabase.auth.admin.deleteUser(studentId);
+            if (authCleanupError) {
+                cleanupErrors.push(
+                    `Unable to remove the newly created seed Auth user: ${authCleanupError.message}`
+                );
+            }
+        }
+
+        if (cleanupErrors.length > 0) {
+            error.message += ` Cleanup also failed: ${cleanupErrors.join("; ")}`;
         }
         throw error;
     }
@@ -698,7 +756,6 @@ async function runDemoStudentSeed({ supabase, config, now = new Date() }) {
 
 module.exports = {
     APPLICATION_TABLES,
-    IDS,
     buildDemoStudentScenario,
     getManilaWeekAnchor,
     runDemoStudentSeed,

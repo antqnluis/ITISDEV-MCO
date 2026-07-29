@@ -295,7 +295,6 @@ async function listCalendarEvents(supabase, studentId, query) {
         .from("calendar_events")
         .select(CALENDAR_EVENT_SELECT, { count: "exact" })
         .eq("student_id", studentId)
-        .eq("source", "manual")
         .lte("starts_at", options.to)
         .or(`ends_at.is.null,ends_at.gte.${options.from}`);
 

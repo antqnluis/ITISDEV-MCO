@@ -22,6 +22,7 @@ async function main() {
     const authAction = result.authUserCreated ? "created" : "updated";
 
     console.log(`Demo student seeded successfully (Auth user ${authAction}).`);
+    console.log(`Student: ${result.firstName} ${result.lastName}`);
     console.log(`Email: ${result.email}`);
     console.log(`Student number: ${result.studentNumber}`);
     console.log(`Student ID: ${result.studentId}`);

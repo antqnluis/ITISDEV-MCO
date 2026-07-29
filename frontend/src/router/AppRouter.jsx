@@ -1,5 +1,10 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
+import {
+    OnboardingOnlyRoute,
+    PublicOnlyRoute,
+    RequireAuth,
+} from "../components/auth/AuthRouteGuards";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Consent from "../pages/Consent";
@@ -15,16 +20,20 @@ function AppRouter() {
     return (
         <BrowserRouter>
             <Routes>
-                <Route path="/" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/consent" element={<Consent />} />
-                <Route path="/onboarding" element={<Onboarding />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/calendar" element={<Calendar />} />
-                <Route path="/check-in" element={<WeeklyCheckIn />} />
-                <Route path="/academic-records" element={<AcademicRecords />} />
+                <Route path="/" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+                <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+                <Route path="/consent" element={<RequireAuth><Consent /></RequireAuth>} />
+                <Route path="/onboarding" element={(
+                    <RequireAuth requireConsent>
+                        <OnboardingOnlyRoute><Onboarding /></OnboardingOnlyRoute>
+                    </RequireAuth>
+                )} />
+                <Route path="/dashboard" element={<RequireAuth requireConsent><Dashboard /></RequireAuth>} />
+                <Route path="/calendar" element={<RequireAuth requireConsent><Calendar /></RequireAuth>} />
+                <Route path="/check-in" element={<RequireAuth requireConsent><WeeklyCheckIn /></RequireAuth>} />
+                <Route path="/academic-records" element={<RequireAuth requireConsent><AcademicRecords /></RequireAuth>} />
                 <Route path="/wellness-plan" element={<WellnessPlan />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings" element={<RequireAuth requireConsent><Settings /></RequireAuth>} />
             </Routes>
         </BrowserRouter>
     );

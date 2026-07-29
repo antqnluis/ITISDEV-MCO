@@ -9,8 +9,9 @@ function EyeIcon() {
   );
 }
 
-function PasswordInput({ id, label, action, ...props }) {
+function PasswordInput({ id, label, action, error, helper, ...props }) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const descriptionId = error ? `${id}-error` : helper ? `${id}-helper` : undefined;
 
   return (
     <div>
@@ -24,7 +25,9 @@ function PasswordInput({ id, label, action, ...props }) {
         <input
           id={id}
           type={isPasswordVisible ? "text" : "password"}
-          className="form-control pr-14"
+          aria-describedby={descriptionId}
+          aria-invalid={Boolean(error)}
+          className={`form-control pr-14 ${error ? "border-danger focus:border-danger focus:ring-danger/15" : ""}`}
           {...props}
         />
         <button
@@ -36,6 +39,8 @@ function PasswordInput({ id, label, action, ...props }) {
           <EyeIcon />
         </button>
       </div>
+      {error && <p id={`${id}-error`} className="mt-2 text-sm font-medium text-danger">{error}</p>}
+      {!error && helper && <p id={`${id}-helper`} className="mt-2 text-sm leading-5 text-soft">{helper}</p>}
     </div>
   );
 }

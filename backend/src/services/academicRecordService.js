@@ -253,6 +253,13 @@ function normalizeListOptions(query = {}) {
 }
 
 function throwDatabaseError(error, operation) {
+    if (operation === "delete" && error.code === "23503") {
+        throw createServiceError(
+            "This academic record cannot be deleted because it is linked to a calendar event",
+            409
+        );
+    }
+
     throw createServiceError(`Unable to ${operation} the academic record`, 500);
 }
 
