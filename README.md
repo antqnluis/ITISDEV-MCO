@@ -6,33 +6,36 @@
 .
 ├── backend/
 │   ├── .env.example
+│   ├── database/
 │   ├── package.json
-│   ├── package-lock.json
+│   ├── scripts/
 │   ├── server.js
-│   └── src/
-│       ├── app.js
-│       ├── config/
-│       ├── controllers/
-│       ├── middleware/
-│       ├── routes/
-│       └── services/
+│   ├── src/
+│   │   ├── app.js
+│   │   ├── calculators/
+│   │   ├── config/
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── routes/
+│   │   ├── seeds/
+│   │   ├── services/
+│   │   └── utils/
+│   └── test/
 ├── docs/
 ├── frontend/
 │   ├── public/
 │   ├── src/
-│   │   ├── assets/
 │   │   ├── components/
 │   │   ├── context/
-│   │   ├── hooks/
 │   │   ├── pages/
 │   │   ├── router/
 │   │   ├── services/
-│   │   ├── styles/
+│   │   ├── test/
+│   │   ├── utils/
 │   │   ├── App.jsx
 │   │   ├── main.jsx
 │   │   └── index.css
 │   ├── package.json
-│   ├── package-lock.json
 │   ├── vite.config.js
 │   └── index.html
 └── README.md
@@ -64,11 +67,13 @@
    cp .env.example .env
    ```
 
-   Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in `backend/.env`. The anon key is used for authentication and all student-scoped requests so Supabase row-level security applies. The server-only service-role key is required to safely roll back incomplete registrations and for trusted operations such as wellness-dimension calculation and academic-record imports; never expose it to clients.
+   Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and `GROQ_API_KEY` in `backend/.env`. The anon key is used for authentication and student-scoped requests. The server-only keys support trusted calculations and AI analysis; never expose them to clients.
 
    The server uses port `9999` by default. To change it, add `PORT=your_port` to `backend/.env`.
 
-4. Start the backend:
+4. Initialize Supabase. For a fresh development database, run `backend/database/intial_sql_stament.sql` in the SQL editor, then enable the `vector` extension and run `004_RAG-schemas.sql` followed by `RLS_query.sql`. The consolidated script deletes and recreates application tables, so existing databases should use the numbered migrations instead.
+
+5. Start the backend:
 
    ```sh
    npm run dev
@@ -80,7 +85,7 @@
    npm start
    ```
 
-5. Open the backend health check:
+6. Open the backend health check:
 
    ```text
    http://localhost:9999/api/health
@@ -130,11 +135,11 @@ Open this URL in your browser.
 ### Prerequisites
 
 - Install [Node.js LTS](https://nodejs.org/), which includes npm.
-- Create a Supabase project and keep its project URL, anon key, and (optionally) service-role key available.
+- Create a Supabase project and keep its project URL, anon key, service-role key, and a Groq API key available.
 - Install the Thunder Client extension in VS Code if you want to test the API from the editor.
 
 ### Configure Supabase
-Copy the project URL and anon key from **Settings > API**.
+Copy the project URL and API keys from **Settings > API**, then apply the database scripts described in the backend setup above.
 
 ### Configure and run the backend
 
@@ -154,6 +159,7 @@ PORT=9999
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+GROQ_API_KEY=your_groq_api_key
 ```
 
 Start the development server:
@@ -174,6 +180,8 @@ Open another PowerShell terminal:
 
 ```powershell
 cd C:\path\to\ITISDEV-MCO\frontend
+npm install
+Copy-Item .env.example .env.local
 npm run dev
 ```
 
@@ -200,6 +208,7 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `POST` | `/api/auth/register` | Create a student authentication account. |
 | `POST` | `/api/auth/login` | Sign in and receive a session access token. |
 | `GET` | `/api/auth/me` | Get the authenticated student. |
+| `PATCH` | `/api/auth/me` | Update the authenticated student's name. |
 | `POST` | `/api/auth/logout` | End the current session. |
 | `PATCH` | `/api/consent` | Record acceptance of privacy notice version `v1.0`. |
 | `POST` | `/api/profile` | Create the authenticated student's profile. |
@@ -209,6 +218,8 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `POST` | `/api/check-ins` | Create a weekly check-in. |
 | `GET` | `/api/check-ins/current` | Get the authenticated student's current Manila-week check-in status. |
 | `POST` | `/api/check-ins/:id/calculate-dimensions` | Calculate and store all five wellness dimensions for one check-in. |
+| `POST` | `/api/check-ins/:id/analyze` | Generate or replace the check-in's Groq wellness analysis. |
+| `GET` | `/api/check-ins/:id/analysis` | Get the saved analysis, or `null` when none exists. |
 | `GET` | `/api/check-ins` | List the authenticated student's check-ins, newest first. |
 | `GET` | `/api/check-ins/:id` | Get one weekly check-in. |
 | `PATCH` | `/api/check-ins/:id` | Update one weekly check-in. |
@@ -229,12 +240,13 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 | `PATCH` | `/api/course-environment-logs/:id` | Update one course-environment log. |
 | `DELETE` | `/api/course-environment-logs/:id` | Delete one course-environment log. |
 | `POST` | `/api/calendar-events` | Create a manual calendar event. |
-| `GET` | `/api/calendar-events?from=&to=` | List manual calendar events overlapping a time range. |
+| `GET` | `/api/calendar-events?from=&to=` | List owned events from all sources overlapping a time range. |
 | `GET` | `/api/calendar-events/:id` | Get one manual calendar event. |
 | `PATCH` | `/api/calendar-events/:id` | Update one manual calendar event. |
 | `DELETE` | `/api/calendar-events/:id` | Delete one manual calendar event. |
 | `GET` | `/api/wellness-dimension-scores` | List the authenticated student's calculated dimension scores. |
 | `GET` | `/api/wellness-dimension-scores/:id` | Get one calculated dimension-score record. |
+| `GET` | `/api/exports/wellness-summary` | Get the authenticated student's export-ready wellness summary. |
 
 Wellness dimension scores are read-only for authenticated students. The list endpoint returns the newest calculations first and accepts `limit` (1–100, default 25), `offset` (default 0), optional `check_in_id`, and optional `calculation_method` (`rule_based`, `machine_learning`, or `hybrid`). For example:
 
@@ -249,6 +261,12 @@ POST /api/check-ins/CHECK_IN_UUID/calculate-dimensions
 ```
 
 The request has no body. The backend loads the student's source data, runs all five rule-based calculators, and returns the stored `wellnessDimensionScore`. Repeating the request recalculates and replaces the score values for that check-in without creating a duplicate. If any dimension lacks enough data to produce a score, the backend returns `409` and stores nothing. `SUPABASE_SERVICE_ROLE_KEY` must be configured on the backend for this operation.
+
+### AI Wellness Plan
+
+The AI flow combines the five deterministic concern scores and the student's reflection with a category-matched entry from `wellness_knowledge_base` when available. Groq (`llama-3.3-70b-versatile`) generates the structured summary, severity, context, keywords, and recommendations, while SWI and risk remain deterministic. Results are upserted into `ai_results` and loaded by the Wellness Plan page. Populate the knowledge table with approved resources to enable retrieval-assisted guidance.
+
+Generate an analysis with an authenticated `POST /api/check-ins/CHECK_IN_UUID/analyze` request containing `{ "dimension_scores_id": "SCORE_UUID" }`. The frontend calls this only when the student selects **Generate AI plan** or **Update AI plan**.
 
 Example registration body:
 
@@ -272,10 +290,7 @@ To accept the privacy notice, send this authenticated request body to `PATCH /ap
 }
 ```
 
-The backend records the acceptance timestamp and privacy notice version `v1.0`.
-All profile, check-in, academic-record, course-environment, calendar-event, and
-wellness-dimension-score endpoints require acceptance of the current privacy notice.
-An authenticated student who has not accepted it receives `403 Current privacy consent is required`.
+The backend records the acceptance timestamp and privacy notice version `v1.0`. Protected application-data routes, AI analysis, exports, and `PATCH /api/auth/me` require current consent. A student without it receives `403 Current privacy consent is required`.
 
 For a profile request, send:
 
@@ -401,9 +416,11 @@ Course-environment logs accept `limit` (1-100, default 25), `offset` (default 0)
 
 Academic-record and course-environment-log responses include `course_id` and a nested `course` object containing `id`, `code`, and `name`; duplicated top-level course code/name fields are no longer returned. Existing databases should apply `backend/database/003_normalize_courses.sql`. The migration backfills courses transactionally and stops if a student has conflicting course names for the same normalized code.
 
+Before pushing, run `npm test` in both `backend` and `frontend`, then run `npm run lint` and `npm run build` in `frontend`. Use `npm run test:groq-live` in `backend` for an optional live model contract check; it calls Groq but does not write to Supabase.
+
 ## Demo Student Seed
 
-The backend includes a comprehensive severe-stress demo persona for midterm testing: a working third-year IT student balancing commuting, family care, and communications responsibilities in a student organization. The seed fills every application table with related profile, wellbeing, academic, course-environment, calendar, dimension-score, and placeholder AI-result data.
+The backend includes a comprehensive severe-stress demo persona for midterm testing: a working third-year IT student balancing commuting, family care, and communications responsibilities in a student organization. The seed fills every application table with related profile, wellbeing, academic, course-environment, calendar, dimension-score, and demo AI-result data.
 
 Add the following server-only values to `backend/.env`:
 
@@ -425,7 +442,7 @@ npm run seed:demo
 
 Dates are anchored to the current Monday in `Asia/Manila`, keeping overdue and upcoming midterm activity current. Record IDs are stable for one Auth user and unique across different demo users, so multiple demo accounts can coexist. Rerunning the command updates and replaces data only when the matching Auth account was previously created by this seed; it refuses to overwrite a normal account. The command prints table counts and login identifiers but does not print the password or service-role key.
 
-The seeded data populates Dashboard, Calendar, Weekly Check-In, Academic Records, and Settings. AI-result rows are placeholders for future backend integration; the Wellness Plan page remains frontend-demo-only.
+The seeded data populates Dashboard, Calendar, Weekly Check-In, Academic Records, Settings, and Wellness Plan. The page loads the seeded saved analysis; after the latest check-in or scores change, the student can select **Update AI plan** to replace it with a live Groq result.
 
 To run the academic engagement calculator against the records that were actually inserted into Supabase, use:
 
